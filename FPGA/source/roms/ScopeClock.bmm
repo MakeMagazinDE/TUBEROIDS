@@ -1,0 +1,6 @@
+ADDRESS_SPACE ram_cntlr RAMB16 [0x00000000:0x00000FFF]
+    BUS_BLOCK
+        MPU4051/rom/rom1.inst [7:4];
+        MPU4051/rom/rom0.inst [3:0];
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;

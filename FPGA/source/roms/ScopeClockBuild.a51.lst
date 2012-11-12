@@ -1,0 +1,1741 @@
+                   ;               ********************************************
+                   ;               *** 8031-Software für ScopeClock-Hardware
+                   ;               ***
+                   ;               *** (c) 2004 by Sascha Ittner (GPL)
+                   ;               ***
+                   ;               *** 24.10.2004: V1.0
+                   ;               *** Erste veröffentliche Version
+                   ;               ********************************************
+                   ;               *** um Delay in Draw-Routine ergänzt von cm
+                   ;               *** für schnellere FPGA-Implementation
+                   ;               ********************************************
+                   ;               *** Konstanten
+                   ;               ********************************************
+                   
+0000:                              .equ TICKS_HZ,        50
+                   
+0000:                              .equ DCF_SYNCTIME,    60
+0000:                              .equ DCF_HITIME,      8
+0000:                              .equ DCF_MINTIME,     3
+0000:                              .equ DCF_MAXTIME,     14
+                   
+0000:                              .equ KEY_DELAY,       50
+0000:                              .equ KEY_REPEAT,      12
+                   
+0000:                              .equ BEAM_OFF_DLY,    010h   ; orig. 10
+0000:                              .equ BEAM_ON_DLY,     030h   ; orig. 30
+0000:                              .equ DRAW_DLY,        40 
+                   
+0000:                              .equ INIT_STACK,      048h
+                   
+0000:                              .equ DISP_TAB_LEN,    11
+0000:                              .equ DISP_TAB,        030h
+0000:                              .equ DISP_TAB_SECPL,  030h
+0000:                              .equ DISP_TAB_SECPH,  031h
+0000:                              .equ DISP_TAB_MINPL,  032h
+0000:                              .equ DISP_TAB_MINPH,  033h
+0000:                              .equ DISP_TAB_HRPL,   034h
+0000:                              .equ DISP_TAB_HRPH,   035h
+0000:                              .equ DISP_TAB_SECNOL, 036h
+0000:                              .equ DISP_TAB_SECNOH, 037h
+0000:                              .equ DISP_TAB_SECNTL, 038h
+0000:                              .equ DISP_TAB_SECNTH, 039h
+0000:                              .equ DISP_TAB_MINNOL, 03Ah
+0000:                              .equ DISP_TAB_MINNOH, 03Bh
+0000:                              .equ DISP_TAB_MINNTL, 03Ch
+0000:                              .equ DISP_TAB_MINNTH, 03Dh
+0000:                              .equ DISP_TAB_HRNOL,  03Eh
+0000:                              .equ DISP_TAB_HRNOH,  03Fh
+0000:                              .equ DISP_TAB_HRNTL,  040h
+0000:                              .equ DISP_TAB_HRNTH,  041h
+0000:                              .equ DISP_TAB_DCFSL,  042h
+0000:                              .equ DISP_TAB_DCFSH,  043h
+0000:                              .equ DISP_TAB_SCALEL, 044h
+0000:                              .equ DISP_TAB_SCALEH, 045h
+                   
+0000:                              .equ DLINE_R0,        000h
+0000:                              .equ DLINE_R1,        001h
+0000:                              .equ DLINE_R2,        002h
+0000:                              .equ DLINE_R3,        003h
+0000:                              .equ DLINE_R4,        004h
+0000:                              .equ DLINE_R5,        005h
+0000:                              .equ DLINE_R6,        006h
+0000:                              .equ DLINE_R7,        007h
+                   
+0000:                              .equ TIME_R0,         008h
+0000:                              .equ TIME_R1,         009h
+0000:                              .equ TIME_R2,         00Ah
+0000:                              .equ TIME_R3,         00Bh
+0000:                              .equ TIME_R4,         00Ch
+0000:                              .equ TIME_R5,         00Dh
+                   
+0000:                              .equ DCF_R0,          010h
+0000:                              .equ DCF_R1,          011h
+0000:                              .equ DCF_R2,          012h
+0000:                              .equ DCF_R3,          013h
+0000:                              .equ DCF_R4,          014h
+0000:                              .equ DCF_R5,          015h
+                   
+0000:                              .equ DCF_MIN,         018h
+0000:                              .equ DCF_HR,          019h
+0000:                              .equ DCF_DAY,         01Ah
+0000:                              .equ DCF_DOW,         01Bh
+0000:                              .equ DCF_MON,         01Ch
+0000:                              .equ DCF_YR,          01Dh
+                   
+0000:                              .equ DLINE_FLAGS,     020h  ; Bits 00-07
+0000:                              .equ DLINE_F_XDIR,    000h
+0000:                              .equ DLINE_F_YDIR,    001h
+0000:                              .equ DLINE_F_SWXY,    002h
+0000:                              .equ DLINE_F_ENEG,    003h
+                   
+0000:                              .equ TIME_FLAGS,      021h  ; Bits 08-0f
+0000:                              .equ TIME_F_UPDD,     008h
+0000:                              .equ TIME_F_ADCH,     009h
+0000:                              .equ TIME_F_KEYREP,   00Ah
+0000:                              .equ TIME_F_SYNC,     00Bh
+0000:                              .equ TIME_F_TICKSND,  00Ch
+0000:                              .equ TIME_F_TOGGLE,  00Dh
+                   
+0000:                              .equ DCF_FLAGS,       022h  ; Bits 10-17
+0000:                              .equ DCF_F_FE,        010h
+0000:                              .equ DCF_F_BIT,       011h
+0000:                              .equ DCF_F_PARITY,    012h
+0000:                              .equ DCF_F_TIMEOK,    013h
+0000:                              .equ DCF_F_STATDATA,  014h
+0000:                              .equ DCF_F_STATOK,    015h
+                   
+0000:                              .equ DCF_TFLAGS,      023h  ; Bits 18-1f
+0000:                              .equ DCF_TF_NULL,     018h
+0000:                              .equ DCF_TF_RES,      019h
+0000:                              .equ DCF_TF_ADD,      01Ah
+0000:                              .equ DCF_TF_CLRP,     01Bh
+0000:                              .equ DCF_TF_CHKP,     01Ch
+0000:                              .equ DCF_TF_SET,      01Dh
+                   
+                   
+                   ;               ********************************************
+                   ;               *** Einsprungspunkte
+                   ;               ********************************************
+                   
+0000:                              .org 0000h                 ; Hauptprogramm
+0000: 01 24                        ajmp Main
+                   
+0003:                              .org 0003h                 ; Externer Interr
+0003: 11 FE                        acall E0IrqHandler
+0005: 32                           reti
+                   
+000B:                              .org 000Bh                 ; Timer 0 Interru
+000B: 11 F7                        acall T0IrqHandler
+000D: 32                           reti
+                   
+0013:                              .org 0013h                 ; Externer Interr
+0013: 32                           reti
+                   
+001B:                              .org 001Bh                 ; Timer 1 Interru
+001B: 32                           reti
+                   
+0023:                              .org 0023h                 ; Serieller Port 
+0023: 32                           reti
+                   
+                   ;               ********************************************
+                   ;               *** Hauptprogramm
+                   ;               ********************************************
+                   
+                   ;               *** Controler initialisieren
+0024: 75 81 48     Main:           mov SP,#INIT_STACK          ; Stackpointer s
+0027: 75 D0 00                     mov PSW,#00000000b          ; Gegister-Bank 
+                   
+002A: 75 90 80                     mov P1,#128                 ; DAC initialisi
+002D: C2 B5                        clr P3.5                    ; DAC A
+002F: C2 B6                        clr P3.6                    ; DAC A1
+0031: C2 B4                        clr P3.4
+0033: D2 B4                        setb P3.4
+0035: D2 B5                        setb P3.5                   ; DAC B
+0037: C2 B4                        clr P3.4
+0039: D2 B4                        setb P3.4
+                   
+003B: 90 04 90                     mov DPTR,#ScaleData         ; Zuerst Zifferb
+003E: 78 30                        mov R0,#DISP_TAB            ; Display-Tabell
+0040: 79 0B                        mov R1,#DISP_TAB_LEN
+0042: A6 82        Main_InitLoop1: mov @R0,DPL
+0044: 08                           inc R0
+0045: A6 83                        mov @R0,DPH
+0047: 08                           inc R0
+0048: D9 F8                        djnz R1,Main_InitLoop1
+                   
+004A: 75 20 00                     mov DLINE_FLAGS,#0          ; Status initial
+004D: 78 00                        mov R0,#0                   ; Zähler für Dis
+004F: 79 80                        mov R1,#128                 ; X1 initialisie
+0051: 7A 80                        mov R2,#128                 ; Y1 initialisie
+0053: 7B 80                        mov R3,#128                 ; X2 initialisie
+0055: 7C 80                        mov R4,#128                 ; Y2 initialisie
+                   
+0057: 75 21 00                     mov TIME_FLAGS,#0           ; Status initial
+005A: 75 08 32                     mov TIME_R0,#TICKS_HZ       ; TICK-Zähler fü
+005D: 75 09 00                     mov TIME_R1,#0              ; Sekunden initi
+0060: 75 0A 00                     mov TIME_R2,#0              ; Minuten initia
+0063: 75 0B 00                     mov TIME_R3,#0              ; Stunden initia
+0066: 75 0C 00                     mov TIME_R4,#0              ; Tmp-Register i
+0069: 75 0D 01                     mov TIME_R5,#1              ; Tastenverzöger
+                   
+006C: 75 22 00                     mov DCF_FLAGS,#0            ; DCF-Flags init
+006F: 75 23 00                     mov DCF_TFLAGS,#0           ; DCF-Tabellen-F
+0072: 75 10 00                     mov DCF_R0,#0               ; Reset Tabellen
+0075: 75 11 3B                     mov DCF_R1,#59              ; Bitzähler init
+0078: 75 12 00                     mov DCF_R2,#0               ; Pulstimer init
+007B: 75 13 3C                     mov DCF_R3,#DCF_SYNCTIME    ; Zähler für Syn
+007E: 75 14 00                     mov DCF_R4,#0               ; DCF-Statusanze
+                   
+0081: 75 89 01                     mov TMOD,#00000001b         ; T0 = Clock dri
+0084: 75 88 01                     mov TCON,#00000001b         ; EXT0 flankenge
+0087: 75 A8 83                     mov IE,#10000011b           ; IRQ enable (T0
+                   
+                   ;               *** Schleife für Bildschirmausgabe
+                   ;               *** Daten holen
+                   Main_Loop:      
+008A: E4                                                                       
+008B: 93                           movc A,@A+DPTR
+008C: A3                           inc DPTR
+008D: 60 4F                        jz Main_DImed               ; 000h = Immedia
+008F: B4 FF 5C                     cjne A,#0FFh,Main_DNorm     ; 0FFh = Tabelle
+                   
+                   ;               *** Neue Displayadresse holen
+0092: 74 30        Main_NewAddr:   mov A,#DISP_TAB             ; Tabellenadress
+0094: 28                           add A,R0
+0095: 28                           add A,R0
+0096: F9                           mov R1,A
+0097: C2 09                        clr TIME_F_ADCH             ; Prüfen, ob Tab
+0099: E7                           mov A,@R1                   ; Daten aus Tabe
+009A: F5 82                        mov DPL,A
+009C: 09                           inc R1
+009D: E7                           mov A,@R1
+009E: F5 83                        mov DPH,A
+00A0: 20 09 EF                     jb TIME_F_ADCH,Main_NewAddr
+                   
+00A3: 08                           inc R0                      ; nächster Eintr
+00A4: B8 0B 37                     cjne R0,#DISP_TAB_LEN,Main_DImed
+                   
+                   ;Wartezeit für TickSound nutzen, R0 nicht mehr gebraucht
+00A7: 30 0C 29                     jnb TIME_F_TICKSND,Main_NoSound ; Prüfen, ob
+00AA: C2 0C                        clr TIME_F_TICKSND
+00AC: B2 0D                        cpl TIME_F_TOGGLE
+00AE: 75 90 94                     mov P1,#094h
+00B1: 20 0D 03                     jb TIME_F_TOGGLE,Main_altsound ; alternative
+00B4: 75 90 00                     mov P1,#000h
+00B7: D2 B5        Main_altsound:  setb P3.5
+00B9: D2 B6                        setb P3.6
+00BB: C2 B4                        clr P3.4
+00BD: D2 B4                        setb P3.4
+00BF: 78 B4                        mov r0,#180        ; Verzögerung für TickSou
+00C1: 20 0D 02                     jb TIME_F_TOGGLE,Main_dsound ; alternativer 
+00C4: 78 0A                        mov r0,#10        ; Verzögerung für TickSoun
+00C6: D8 FE        Main_dsound:    djnz r0,Main_dsound
+00C8: 75 90 80                     mov P1,#080h
+00CB: C2 B4                        clr  P3.4
+00CD: D2 B4                        setb P3.4
+00CF: C2 B5                        clr  P3.5
+00D1: C2 B6                        clr  P3.6
+                   Main_NoSound:                  
+00D3: 78 00                        mov R0,#0
+00D5: D2 B7                        setb P3.7                   ; Strahl aus
+                   
+00D7: C2 0B                        clr TIME_F_SYNC             ; Auf Sync warte
+00D9: 30 0B FD     Main_Wait:      jnb TIME_F_SYNC,Main_Wait
+                   
+                   
+00DC: 01 E4                        ajmp Main_DImed_Get
+                   
+00DE: 7F 10        Main_DImed:     mov R7,#BEAM_OFF_DLY        ; Verzögerung, u
+00E0: DF FE        Main_DImed_DLY: djnz R7,Main_DImed_DLY      ; vermeiden
+00E2: D2 B7                        setb P3.7                   ; Strahl aus
+00E4: E4           Main_DImed_Get: clr A                       ; erstes X/Y-Paa
+00E5: 93                           movc A,@A+DPTR
+00E6: A3                           inc DPTR
+00E7: F9                           mov R1,A
+00E8: E4                           clr A
+00E9: 93                           movc A,@A+DPTR
+00EA: A3                           inc DPTR
+00EB: FA                           mov R2,A
+00EC: 01 8A                        ajmp Main_Loop
+                   
+00EE: FB           Main_DNorm:     mov R3,A                    ; alles andere s
+00EF: E4                           clr A
+00F0: 93                           movc A,@A+DPTR
+00F1: A3                           inc DPTR
+00F2: FC                           mov R4,A
+                   
+                   ;               *** Linie Zeichnen
+00F3: 71 23                        acall DrawLine
+                   
+00F5: 01 8A                        ajmp Main_Loop
+                   
+                   ;               ********************************************
+                   ;               *** Handler für Interrupt T0
+                   ;               ********************************************
+00F7: C2 8C        T0IrqHandler:   clr TCON.4                  ; Timer 0 stoppe
+00F9: C2 89                        clr TCON.1                  ; IE-Flag für Ne
+00FB: D2 A8                        setb IE.0                   ; Nezt-IRQ zulas
+00FD: 22                           ret
+                   
+                   ;               ********************************************
+                   ;               *** Handler für Interrupt E0
+                   ;               ***
+                   ;               *** Benutze Register
+                   ;               ***   R0 - Tick-Counter für Sekunden
+                   ;               ***   R1 - Sekunden
+                   ;               ***   R2 - Minuten
+                   ;               ***   R3 - Stunden
+                   ;               ***   R4 - Tmp-Register
+                   ;               ***   R5 - Wiederholungszähler für Tasten
+                   ;               ********************************************
+                   
+00FE: C0 D0        E0IrqHandler:   push PSW
+0100: C0 E0                        push ACC
+0102: C0 F0                        push B
+0104: C0 82                        push DPL
+0106: C0 83                        push DPH
+0108: 75 D0 08                     mov PSW,#00001000b          ; Gegister-Bank 
+                   
+010B: C2 A8                        clr IE.0                    ; Netz-IRQ sperr
+010D: 75 8C 8A                     mov TH0,#08Ah               ; Gate-Timer ini
+0110: 75 8A D0                     mov TL0,#0D0h
+0113: D2 8C                        setb TCON.4                 ; und starten
+                   
+0115: 51 09                        acall CheckKey              ; Tasten abfrage
+                   
+0117: D8 1E                        djnz R0,E0IrqH_DispAdr      ; Tick-Zähler ak
+0119: 78 32                        mov R0,#TICKS_HZ
+                   
+                   ;               *** Zeiten aktualisieren
+011B: D2 08                        setb TIME_F_UPDD            ; Merker für Dis
+011D: D2 0C                        setb TIME_F_TICKSND
+011F: 09                           inc R1                      ; Sekunden aktua
+0120: B9 3C 14                     cjne R1,#60,E0IrqH_DispAdr
+0123: 79 00                        mov R1,#0
+                   
+0125: 71 11                        acall DCF77_UpdStat         ; Einmal pro Min
+0127: C2 15                        clr DCF_F_STATOK
+0129: C2 14                        clr DCF_F_STATDATA
+                   
+012B: 0A                           inc R2                      ; Minuten aktual
+012C: BA 3C 08                     cjne R2,#60,E0IrqH_DispAdr
+012F: 7A 00                        mov R2,#0
+0131: 0B                           inc R3                      ; Stunden aktual
+0132: BB 18 02                     cjne R3,#24,E0IrqH_DispAdr
+0135: 7B 00                        mov R3,#0
+                   
+                   ;               *** Display-Adressen aktualisieren
+0137: 51 3D        E0IrqH_DispAdr: acall DCF77                ; DCF77-Zeit ausw
+0139: 30 08 08                     jnb TIME_F_UPDD,E0IrqH_Out ; Prüfen, ob Upda
+013C: 31 51                        acall DispAdrPtr
+013E: 31 96                        acall DispAdrNum
+0140: C2 08                        clr TIME_F_UPDD
+0142: D2 09                        setb TIME_F_ADCH
+                   
+0144: D2 0B        E0IrqH_Out:     setb TIME_F_SYNC           ; Sync-Bit setzen
+0146: D0 83                        pop DPH
+0148: D0 82                        pop DPL
+014A: D0 F0                        pop B
+014C: D0 E0                        pop ACC
+014E: D0 D0                        pop PSW
+0150: 22                           ret
+                   
+                   ;               ********************************************
+                   ;               *** Display-Adressen für Zeiger aktualisiere
+                   ;               ********************************************
+                   
+0151: 90 06 4C     DispAdrPtr:     mov DPTR,#SecPtrData        ; Daten für Seku
+0154: E9                           mov A,R1                    ; Aktuellen Wert
+0155: 75 F0 05                     mov B,#5                    ; Sekundenzeiger
+0158: A4                           mul AB
+0159: 25 82                        add A,DPL
+015B: F5 30                        mov DISP_TAB_SECPL,A
+015D: E5 F0                        mov A,B
+015F: 35 83                        addc A,DPH
+0161: F5 31                        mov DISP_TAB_SECPH,A
+                   
+0163: 90 07 78                     mov DPTR,#MinPtrData        ; Daten für Minu
+0166: EA                           mov A,R2                    ; Aktuellen Wert
+0167: 75 F0 09                     mov B,#9                    ; Minutenzeiger 
+016A: A4                           mul AB
+016B: 25 82                        add A,DPL
+016D: F5 32                        mov DISP_TAB_MINPL,A
+016F: E5 F0                        mov A,B
+0171: 35 83                        addc A,DPH
+0173: F5 33                        mov DISP_TAB_MINPH,A
+                   
+0175: 90 09 94                     mov DPTR,#HrPtrData         ; Daten für Stun
+0178: EA                           mov A,R2                    ; Aktuellen Wert
+0179: 75 F0 0C                     mov B,#12                   ; Etwas aufwendi
+017C: 84                           div AB                      ; erforderlich (
+017D: FC                           mov R4,A                    ; dazu Minuten d
+017E: EB                           mov A,R3                    ; auf die Zuwisc
+017F: 75 F0 0C                     mov B,#12                   ; und Stundenwer
+0182: 84                           div AB
+0183: 74 05                        mov A,#5
+0185: A4                           mul AB
+0186: 2C                           add A,R4
+0187: 75 F0 09                     mov B,#9                    ; Stundenzeiger 
+018A: A4                           mul AB
+018B: 25 82                        add A,DPL
+018D: F5 34                        mov DISP_TAB_HRPL,A
+018F: E5 F0                        mov A,B
+0191: 35 83                        addc A,DPH
+0193: F5 35                        mov DISP_TAB_HRPH,A
+                   
+0195: 22                           ret
+                   
+                   ;               ********************************************
+                   ;               *** Display-Adressen für Nummern aktualisier
+                   ;               ********************************************
+                   
+0196: E9           DispAdrNum:     mov A,R1                    ; Daten für Seku
+0197: 75 F0 0A                     mov B,#10
+019A: 84                           div AB                      ; Zehner
+019B: 23                           rl A
+019C: FC                           mov R4,A
+019D: 90 0C 85                     mov DPTR,#NumSecTens
+01A0: 93                           movc A,@A+DPTR
+01A1: F5 39                        mov DISP_TAB_SECNTH,A
+01A3: EC                           mov A,R4
+01A4: 04                           inc A
+01A5: 93                           movc A,@A+DPTR
+01A6: F5 38                        mov DISP_TAB_SECNTL,A
+01A8: E5 F0                        mov A,B                     ; Einer
+01AA: 23                           rl A
+01AB: FC                           mov R4,A
+01AC: 90 0B B0                     mov DPTR,#NumSecOnes
+01AF: 93                           movc A,@A+DPTR
+01B0: F5 37                        mov DISP_TAB_SECNOH,A
+01B2: EC                           mov A,R4
+01B3: 04                           inc A
+01B4: 93                           movc A,@A+DPTR
+01B5: F5 36                        mov DISP_TAB_SECNOL,A
+                   
+01B7: EA                           mov A,R2                    ; Daten für Minu
+01B8: 75 F0 0A                     mov B,#10
+01BB: 84                           div AB                      ; Zehner
+01BC: 23                           rl A
+01BD: FC                           mov R4,A
+01BE: 90 0D C9                     mov DPTR,#NumMinTens
+01C1: 93                           movc A,@A+DPTR
+01C2: F5 3D                        mov DISP_TAB_MINNTH,A
+01C4: EC                           mov A,R4
+01C5: 04                           inc A
+01C6: 93                           movc A,@A+DPTR
+01C7: F5 3C                        mov DISP_TAB_MINNTL,A
+01C9: E5 F0                        mov A,B                     ; Einer
+01CB: 23                           rl A
+01CC: FC                           mov R4,A
+01CD: 90 0C F4                     mov DPTR,#NumMinOnes
+01D0: 93                           movc A,@A+DPTR
+01D1: F5 3B                        mov DISP_TAB_MINNOH,A
+01D3: EC                           mov A,R4
+01D4: 04                           inc A
+01D5: 93                           movc A,@A+DPTR
+01D6: F5 3A                        mov DISP_TAB_MINNOL,A
+                   
+01D8: EB                           mov A,R3                    ; Daten für Stun
+01D9: 75 F0 0A                     mov B,#10
+01DC: 84                           div AB                      ; Zehner
+01DD: 23                           rl A
+01DE: FC                           mov R4,A
+01DF: 90 0F 0D                     mov DPTR,#NumHrTens
+01E2: 93                           movc A,@A+DPTR
+01E3: F5 41                        mov DISP_TAB_HRNTH,A
+01E5: EC                           mov A,R4
+01E6: 04                           inc A
+01E7: 93                           movc A,@A+DPTR
+01E8: F5 40                        mov DISP_TAB_HRNTL,A
+01EA: E5 F0                        mov A,B                     ; Einer
+01EC: 23                           rl A
+01ED: FC                           mov R4,A
+01EE: 90 0E 38                     mov DPTR,#NumHrOnes
+01F1: 93                           movc A,@A+DPTR
+01F2: F5 3F                        mov DISP_TAB_HRNOH,A
+01F4: EC                           mov A,R4
+01F5: 04                           inc A
+01F6: 93                           movc A,@A+DPTR
+01F7: F5 3E                        mov DISP_TAB_HRNOL,A
+                   
+01F9: E5 14                        mov A,DCF_R4                ; Daten für DCF-
+01FB: 23                           rl A
+01FC: FC                           mov R4,A
+01FD: 90 0F 3C                     mov DPTR,#DCFStats
+0200: 93                           movc A,@A+DPTR
+0201: F5 43                        mov DISP_TAB_DCFSH,A
+0203: EC                           mov A,R4
+0204: 04                           inc A
+0205: 93                           movc A,@A+DPTR
+0206: F5 42                        mov DISP_TAB_DCFSL,A
+                   
+0208: 22                           ret
+                   
+                   ;               ********************************************
+                   ;               *** Taster abfragen
+                   ;               ********************************************
+                   
+0209: A2 B0        CheckKey:       mov C,P3.0                  ; Checken, ob Ta
+020B: 82 B1                        anl C,P3.1
+020D: 50 06                        jnc CheckKey_Down
+020F: 7D 01                        mov R5,#1                   ; Reset Wiederho
+0211: C2 0A                        clr TIME_F_KEYREP
+0213: 41 3C                        ajmp CheckKey_Out
+                   
+0215: DD 25        CheckKey_Down:  djnz R5,CheckKey_Out        ; Prüfen, ob Zei
+0217: 7D 0C                        mov R5,#KEY_REPEAT          ; Default: Wiede
+0219: 20 0A 04                     jb TIME_F_KEYREP,CheckKey_Proc
+021C: 7D 32                        mov R5,#KEY_DELAY           ; Erster Tastend
+021E: D2 0A                        setb TIME_F_KEYREP
+                   
+0220: D2 08        CheckKey_Proc:  setb TIME_F_UPDD            ; Merker für Dis
+0222: C2 15                        clr DCF_F_STATOK            ; DCF-Status zur
+0224: 71 11                        acall DCF77_UpdStat
+                   
+0226: 20 B0 0A     CheckKey_Proc0: jb P3.0,CheckKey_Proc1
+0229: 78 32                        mov R0,#TICKS_HZ            ; reset Tick-Zäh
+022B: 79 00                        mov R1,#0                   ; Sekunden auf 0
+022D: 0A                           inc R2                      ; Minuten ändern
+022E: BA 3C 02                     cjne R2,#60,CheckKey_Proc1
+0231: 7A 00                        mov R2,#0
+                   
+0233: 20 B1 06     CheckKey_Proc1: jb P3.1,CheckKey_Out
+0236: 0B                           inc R3                      ; Stunden ändern
+0237: BB 18 02                     cjne R3,#24,CheckKey_Out
+023A: 7B 00                        mov R3,#0
+                   
+023C: 22           CheckKey_Out:   ret
+                   
+                   
+                   ;               ********************************************
+                   ;               *** DCF77-Zeit auswerten
+                   ;               ***
+                   ;               *** Verwendete Register:
+                   ;               ***   R0   - Tepmorärer Zeiger
+                   ;               ***   R1   - Impulszähler (Sekunden)
+                   ;               ***   R2   - Zähler für Impulslänge
+                   ;               ***   R3   - Zähler für Sync-Pause
+                   ;               ***   R4   - Status für Anzeige
+                   ;               ***   R5   - Tepmoräres Register
+                   ;               ***   B    - Tepmoräres Register
+                   ;               ***   DPTR - Tepmorärer Zeiger
+                   ;               ********************************************
+                   
+023D: C0 D0        DCF77:          push PSW
+023F: C0 E0                        push ACC
+0241: 75 D0 10                     mov PSW,#00010000b          ; Gegister-Bank 
+                   
+0244: 20 B3 27                     jb P3.3,DCF77_Lo            ; Eingang auswer
+                   
+                   ;               *** Hi-Zustand des Eingange behandeln
+0247: 30 13 16     DCF77_Hi:       jnb DCF_F_TIMEOK,DCF77_HiC1 ; ggf. Zeit aktu
+024A: C2 13                        clr DCF_F_TIMEOK
+024C: 75 08 32                     mov TIME_R0,#TICKS_HZ       ; reset Tick-Zäh
+024F: 75 09 00                     mov TIME_R1,#0              ; Sekunden auf 0
+0252: E5 18                        mov A,DCF_MIN
+0254: F5 0A                        mov TIME_R2,A
+0256: E5 19                        mov A,DCF_HR
+0258: F5 0B                        mov TIME_R3,A
+025A: D2 08                        setb TIME_F_UPDD            ; Merker für Dis
+025C: D2 15                        setb DCF_F_STATOK           ; Flag für Statu
+025E: 71 11                        acall DCF77_UpdStat
+                   
+0260: 7B 3C        DCF77_HiC1:     mov R3,#DCF_SYNCTIME        ; Zähler für Syn
+0262: D2 10                        setb DCF_F_FE               ; Flag für Flank
+                   
+0264: BA 0E 04                     cjne R2,#DCF_MAXTIME,DCF77_HiC2
+0267: 79 3B                        mov R1,#59                  ; Nichts weiter 
+0269: 61 0C                        ajmp DCF77_Out
+026B: 0A           DCF77_HiC2:     inc R2                      ; Zähler für Imp
+026C: 61 0C                        ajmp DCF77_Out
+                   
+                   ;               *** Lo-Zustand des Eingange behandeln
+026E: EB           DCF77_Lo:       mov A,R3                    ; Sync-Timer prü
+026F: 60 06                        jz DCF77_LoFlag             ; Nix machen, we
+0271: 14                           dec A
+0272: FB                           mov R3,A
+0273: 70 02                        jnz DCF77_LoFlag            ; Wenn auf null 
+0275: 79 00                        mov R1,#0                   ; Bitzähler zurü
+                   
+                   ;               *** Fallende Flanke des Eingange behandeln
+0277: 30 10 0C     DCF77_LoFlag:   jnb DCF_F_FE,DCF77_LoOut    ; Nur Flanken si
+027A: C2 10                        clr DCF_F_FE                ; Flag für Flank
+                   
+027C: D2 14                        setb DCF_F_STATDATA         ; Flag für Daten
+027E: 71 11                        acall DCF77_UpdStat
+                   
+0280: EA                           mov A,R2                    ; Impulslänge me
+0281: 7A 00                        mov R2,#0                   ; Zähler für Imp
+                   
+0283: B9 3B 02                     cjne R1,#59,DCF77_LoCkTime  ; maximal 58 Bit
+0286: 61 0C        DCF77_LoOut:    ajmp DCF77_Out
+                   
+0288: F5 F0        DCF77_LoCkTime: mov B,A                     ; Minimale Pulsl
+028A: C3                           clr C
+028B: 94 03                        subb A,#DCF_MINTIME
+028D: 50 04                        jnc DCF77_LoBit
+028F: 79 3B                        mov R1,#59                  ; Nichts weiter 
+0291: 61 0C                        ajmp DCF77_Out
+                   
+0293: E5 F0        DCF77_LoBit:    mov A,B
+0295: C3                           clr C                       ; Bitstatus ermi
+0296: 94 08                        subb A,#DCF_HITIME
+0298: B3                           cpl C
+0299: 92 11                        mov DCF_F_BIT,C
+                   
+                   ;               *** Daten aus Decode-Tabelle holen
+029B: E9                           mov A,R1                    ; Adresse des Ta
+029C: 75 F0 03                     mov B,#3                    ; ein Eintrag is
+029F: A4                           mul AB
+02A0: F5 F0                        mov B,A
+02A2: 90 03 CA                     mov DPTR,#DCF_Tab
+02A5: 93                           movc A,@DPTR+A              ; Flagmaske lese
+02A6: F5 23                        mov DCF_TFLAGS,A
+02A8: 05 F0                        inc B
+02AA: E5 F0                        mov A,B
+02AC: 93                           movc A,@DPTR+A              ; Wertadresse le
+02AD: F8                           mov R0,A
+02AE: 05 F0                        inc B
+02B0: E5 F0                        mov A,B
+02B2: 93                           movc A,@DPTR+A              ; Wert lesen
+02B3: F5 F0                        mov B,A
+                   
+                   ;               *** Einzelne Aktionen ausführen
+                   ;               *** Check ob gelesenes Bit 0 ist
+02B5: 30 18 03     DCF77_TabNULL:  jnb DCF_TF_NULL,DCF77_TabSET
+02B8: 20 11 11                     jb DCF_F_BIT,DCF77_TabCHKPE
+                   
+                   ;               *** Check ob gelesenes Bit 1 ist
+02BB: 30 1D 03     DCF77_TabSET:   jnb DCF_TF_SET,DCF77_TabCHKP
+02BE: 30 11 0B                     jnb DCF_F_BIT,DCF77_TabCHKPE
+                   
+                   ;               *** Parity-Bit prüfen
+02C1: 30 1C 0C     DCF77_TabCHKP:  jnb DCF_TF_CHKP,DCF77_TabCLRP
+02C4: A2 12                        mov C,DCF_F_PARITY
+02C6: 30 11 01                     jnb DCF_F_BIT,DCF77_TabCHKPC
+02C9: B3                           cpl C
+02CA: 50 04        DCF77_TabCHKPC: jnc DCF77_TabCLRP
+02CC: 79 3B        DCF77_TabCHKPE: mov R1,#59                  ; Nichts weiter 
+02CE: 61 0C                        ajmp DCF77_Out
+                   
+                   ;               *** Parity-Bit zurücksetzen
+02D0: 30 1B 02     DCF77_TabCLRP:  jnb DCF_TF_CLRP,DCF77_TabRES
+02D3: C2 12                        clr DCF_F_PARITY
+                   
+                   ;               *** Aktuellen Wert zurücksetzen
+02D5: 30 19 02     DCF77_TabRES:   jnb DCF_TF_RES,DCF77_TabADD
+02D8: E4                           clr A
+02D9: F6                           mov @R0,A
+                   
+                   ;               *** Aktuellen Wert addieren
+02DA: 30 1A 07     DCF77_TabADD:   jnb DCF_TF_ADD,DCF77_TabNone
+02DD: 30 11 04                     jnb DCF_F_BIT,DCF77_TabNone
+02E0: E6                           mov A,@R0
+02E1: 25 F0                        add A,B
+02E3: F6                           mov @R0,A
+                   
+02E4: B9 3A 1F     DCF77_TabNone:  cjne R1,#58,DCF77_TabOut    ; Flag für Korre
+02E7: 90 04 7E                     mov DPTR,#DCF_ValCheck      ; Wertbereiche p
+02EA: 7D 06                        mov R5,#6
+02EC: E4           DCF77_ValCkeck: clr A                       ; Wertadresse ho
+02ED: 93                           movc A,@DPTR+A
+02EE: A3                           inc DPTR
+02EF: F8                           mov R0,A
+02F0: E4                           clr A                       ; Mindestwert pr
+02F1: 93                           movc A,@DPTR+A
+02F2: A3                           inc DPTR
+02F3: F5 F0                        mov B,A
+02F5: E6                           mov A,@R0
+02F6: C3                           clr C
+02F7: 95 F0                        subb A,B
+02F9: 40 0B                        jc DCF77_TabOut
+02FB: E4                           clr A                       ; Maximalwert pr
+02FC: 93                           movc A,@DPTR+A
+02FD: A3                           inc DPTR
+02FE: C3                           clr C
+02FF: 96                           subb A,@R0
+0300: 40 04                        jc DCF77_TabOut
+0302: DD E8                        djnz R5,DCF77_ValCkeck
+0304: D2 13                        setb DCF_F_TIMEOK           ; Flag für Korre
+                   
+0306: 09           DCF77_TabOut:   inc R1                      ; Bitzähler aktu
+0307: 30 11 02                     jnb DCF_F_BIT,DCF77_Out     ; Parity aktuali
+030A: B2 12                        cpl DCF_F_PARITY
+                   
+030C: D0 E0        DCF77_Out:      pop ACC
+030E: D0 D0                        pop PSW
+0310: 22                           ret
+                   
+0311: 30 15 04     DCF77_UpdStat:  jnb DCF_F_STATOK,DCF77_UpSt1
+0314: 75 14 02                     mov DCF_R4,#2
+0317: 22                           ret
+0318: 30 14 04     DCF77_UpSt1:    jnb DCF_F_STATDATA,DCF77_UpSt0
+031B: 75 14 01                     mov DCF_R4,#1
+031E: 22                           ret
+031F: 75 14 00     DCF77_UpSt0:    mov DCF_R4,#0
+0322: 22                           ret
+                   
+                   ;               ********************************************
+                   ;               *** Linien-Routine
+                   ;               ***
+                   ;               *** Parameter:
+                   ;               ***   R1 - X-Start
+                   ;               ***   R2 - Y-Start
+                   ;               ***   R3 - X-Ziel
+                   ;               ***   R4 - Y-Ziel
+                   ;               ***
+                   ;               *** Rückgabe:
+                   ;               ***   DLINE_FLAGS - Status-Register
+                   ;               ***   R5          - DeltaX
+                   ;               ***   R6          - DeltaY
+                   ;               ***   R7          - Fehler-Register
+                   ;               ***
+                   ;               *** Bugs:
+                   ;               ***   Fehlerregister hat ein Bit zu wenig, u
+                   ;               ***   DeltaY-Werte > 127 zu verarbeiten
+                   ;               ***   Reicht aber für unsere Zwecke
+                   ;               ********************************************
+                                    
+0323: 75 20 00     DrawLine:       mov DLINE_FLAGS,#0          ; Status initial
+                   
+                   ;               *** DAC initialisieren, wenn Strahl aus ist
+0326: 30 B7 17                     jnb P3.7,DrawLine_DLT
+0329: 89 90                        mov P1,r1                    ; DAC 1 aktuali
+032B: C2 B5                        clr P3.5
+032D: C2 B4                        clr P3.4
+032F: D2 B4                        setb P3.4
+0331: EA                           mov a,r2                    ; DAC 2 aktualis
+0332: 64 FF                        xrl a,#0ffh
+0334: F5 90                        mov P1,a
+0336: D2 B5                        setb P3.5
+0338: C2 B4                        clr P3.4
+033A: D2 B4                        setb P3.4
+033C: 7F 30                        mov R7,#BEAM_ON_DLY         ; Verzögerung, u
+033E: DF FE        DrawLine_IDL:   djnz R7,DrawLine_IDL        ; vermeiden
+                   
+                   ;               *** Deltas berechnen
+0340: C3           DrawLine_DLT:   clr C                       ; deltaX berechn
+0341: E9                           mov A,R1
+0342: 9B                           subb A,R3
+0343: 50 03                        jnc DrawLine_DXC
+0345: 14                           dec A
+0346: 64 FF                        xrl A,#0FFh
+0348: FD           DrawLine_DXC:   mov R5,A
+0349: C3                           clr C                       ; deltaY berechn
+034A: EA                           mov A,R2
+034B: 9C                           subb A,R4
+034C: 50 03                        jnc DrawLine_DYC
+034E: 14                           dec A
+034F: 64 FF                        xrl A,#0FFh
+0351: FE           DrawLine_DYC:   mov R6,A
+                   
+                   ;               *** X- und Y-Werte tauschen, wenn erforderli
+0352: C3                           clr C                       ; deltaX muß > d
+0353: ED                           mov A,R5                    ; wenn doch, X- 
+0354: 9E                           subb A,R6
+0355: 50 0B                        jnc DrawLine_DIR
+0357: D2 02                        setb DLINE_F_SWXY
+0359: E9                           mov A,R1
+035A: CA                           xch A,R2
+035B: F9                           mov R1,A
+035C: EB                           mov A,R3
+035D: CC                           xch A,R4
+035E: FB                           mov R3,A
+035F: ED                           mov A,R5
+0360: CE                           xch A,R6
+0361: FD                           mov R5,A
+                   
+                   ;               *** Richtungen ermitteln
+0362: C3           DrawLine_DIR:   clr C                       ; X-Richtung erm
+0363: EB                           mov A,R3
+0364: 99                           subb A,R1
+0365: 92 00                        mov DLINE_F_XDIR,C
+0367: C3                           clr C                       ; Y-Richtung erm
+0368: EC                           mov A,R4
+0369: 9A                           subb A,R2
+036A: 92 01                        mov DLINE_F_YDIR,C
+                   
+                   ;               *** Flags setzen
+036C: 7F 00                        mov R7,#0                   ; Fehler-Registe
+036E: C2 B7                        clr P3.7                    ; Strahl an, wen
+                   
+                   ;               *** DAC aktualisieren
+0370: A2 02        DrawLineLoop:   mov C,DLINE_F_SWXY          ; Swaping von X/
+0372: E9                           mov a,r1                    ; DAC 1 aktualis
+0373: 50 02                         jnc noInvert1
+0375: 64 FF                         xrl a,#0ffh
+0377: F5 90        noInvert1:       mov P1,a
+0379: 92 B5                        mov P3.5,C
+037B: C2 B4                        clr P3.4
+037D: D2 B4                        setb P3.4
+037F: B3                           cpl C                       ; anderen DAC wä
+0380: EA                           mov a,r2                    ; DAC 2 aktualis
+0381: 50 02                         jnc noInvert2
+0383: 64 FF                         xrl a,#0ffh
+0385: F5 90        noInvert2:       mov P1,a
+0387: 92 B5                        mov P3.5,C
+0389: C2 B4                        clr P3.4
+038B: D2 B4                        setb P3.4
+                   ;               --------------------------------------------
+038D: 75 F0 28                     MOV   B,#DRAW_DLY              ; ins Draw de
+                   DrawLine_IDL2:  
+0390: D5 F0 FD                     DJNZ  B,DrawLine_IDL2         
+                   ;               --------------------------------------------
+                   
+                   ;               *** prüfen, ob Ziel erreicht
+0393: E9                           mov A,R1
+0394: B5 03 08                     cjne A,DLINE_R3,DrawLine_Err
+0397: 30 02 2F                     jnb DLINE_F_SWXY,DrawLine_Out
+039A: E9                           mov A,R1                    ;ggf. X- und Y-W
+039B: CA                           xch A,R2
+039C: F9                           mov R1,A
+039D: 61 C9                        ajmp DrawLine_Out
+                   
+                   ;               *** Fehler aktualisieren
+039F: EF           DrawLine_Err:   mov A,R7
+03A0: 2E                           add A,R6
+03A1: FF                           mov R7,A
+03A2: 50 02                        jnc DrawLine_ChkY
+03A4: C2 03                        clr DLINE_F_ENEG
+                   
+                   ;               *** Wenn Fehler zu groß, einen Schritt in Y-
+03A6: 20 03 17     DrawLine_ChkY:  jb DLINE_F_ENEG,DrawLine_IncX
+03A9: ED                           mov A,R5
+03AA: D3                           setb C
+03AB: 9F                           subb A,R7
+03AC: 40 05                        jc DrawLine_IncY
+03AE: 9F                           subb A,R7
+03AF: 40 02                        jc DrawLine_IncY
+03B1: 61 C0                        ajmp DrawLine_IncX
+03B3: EF           DrawLine_IncY:  mov A,R7                    ; Fehler und Y-W
+03B4: C3                           clr C
+03B5: 9D                           subb A,R5
+03B6: FF                           mov R7,A
+03B7: 92 03                        mov DLINE_F_ENEG,C
+03B9: 20 01 03                     jb DLINE_F_YDIR,DrawLine_IncYN
+03BC: 0A                           inc R2
+03BD: 61 C0                        ajmp DrawLine_IncX
+03BF: 1A           DrawLine_IncYN: dec R2
+                   
+                   ;               *** X-Wert aktualisieren
+03C0: 20 00 03     DrawLine_IncX:  jb DLINE_F_XDIR,DrawLine_IncXN
+03C3: 09                           inc R1
+03C4: 61 70                        ajmp DrawLineLoop
+03C6: 19           DrawLine_IncXN: dec R1
+03C7: 61 70                        ajmp DrawLineLoop
+                   
+03C9: 22           DrawLine_Out:   ret
+                   
+                   ;               ********************************************
+                   ;               *** Tabelle für DCF77-Decodierer
+                   ;               ***
+                   ;               *** Satzaufbau:
+                   ;               ***  1. Bitmaske für Flags
+                   ;               ***  2. Adresse für Wertmerker
+                   ;               ***  3. Wert bei gesetztem Bit
+                   ;               ***
+                   ;               *** Flag-Bits:
+                   ;               ***  0 - Empfangendes Bit muß 0 sein
+                   ;               ***  1 - Wertmerker vor Addition zurücksetze
+                   ;               ***  2 - Aktuellen Wert auf Wertmerker addie
+                   ;               ***  3 - Paritybit zurücksetzen
+                   ;               ***  4 - Paritybit mit empfangenen Bit vergl
+                   ;               ***  5 - Empfangendes Bit muß 1 sein
+                   ;               ********************************************
+                   
+03CA: 01 00 00     DCF_Tab:        .db 00000001b,0,0           ; DCF-Sekunde 0 
+03CD: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 1
+03D0: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 2
+03D3: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 3
+03D6: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 4
+03D9: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 5
+03DC: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 6
+03DF: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 7
+03E2: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 8
+03E5: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 9
+03E8: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 10
+03EB: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 11
+03EE: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 12
+03F1: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 13
+03F4: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 14
+03F7: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 15
+03FA: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 16
+03FD: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 17
+0400: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 18
+0403: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 19
+0406: 20 00 00                     .db 00100000b,0,0           ; DCF-Sekunde 20
+                   
+0409: 0E 18 01                     .db 00001110b,DCF_MIN,1     ; DCF-Sekunde 21
+040C: 04 18 02                     .db 00000100b,DCF_MIN,2     ; DCF-Sekunde 22
+040F: 04 18 04                     .db 00000100b,DCF_MIN,4     ; DCF-Sekunde 23
+0412: 04 18 08                     .db 00000100b,DCF_MIN,8     ; DCF-Sekunde 24
+0415: 04 18 0A                     .db 00000100b,DCF_MIN,10    ; DCF-Sekunde 25
+0418: 04 18 14                     .db 00000100b,DCF_MIN,20    ; DCF-Sekunde 26
+041B: 04 18 28                     .db 00000100b,DCF_MIN,40    ; DCF-Sekunde 27
+041E: 10 00 00                     .db 00010000b,0,0           ; DCF-Sekunde 28
+                   
+0421: 0E 19 01                     .db 00001110b,DCF_HR,1      ; DCF-Sekunde 29
+0424: 04 19 02                     .db 00000100b,DCF_HR,2      ; DCF-Sekunde 30
+0427: 04 19 04                     .db 00000100b,DCF_HR,4      ; DCF-Sekunde 31
+042A: 04 19 08                     .db 00000100b,DCF_HR,8      ; DCF-Sekunde 32
+042D: 04 19 0A                     .db 00000100b,DCF_HR,10     ; DCF-Sekunde 33
+0430: 04 19 14                     .db 00000100b,DCF_HR,20     ; DCF-Sekunde 34
+0433: 10 00 00                     .db 00010000b,0,0           ; DCF-Sekunde 35
+                   
+0436: 0E 1A 01                     .db 00001110b,DCF_DAY,1     ; DCF-Sekunde 36
+0439: 04 1A 02                     .db 00000100b,DCF_DAY,2     ; DCF-Sekunde 37
+043C: 04 1A 04                     .db 00000100b,DCF_DAY,4     ; DCF-Sekunde 38
+043F: 04 1A 08                     .db 00000100b,DCF_DAY,8     ; DCF-Sekunde 39
+0442: 04 1A 0A                     .db 00000100b,DCF_DAY,10    ; DCF-Sekunde 40
+0445: 04 1A 14                     .db 00000100b,DCF_DAY,20    ; DCF-Sekunde 41
+0448: 06 1B 01                     .db 00000110b,DCF_DOW,1     ; DCF-Sekunde 42
+044B: 04 1B 02                     .db 00000100b,DCF_DOW,2     ; DCF-Sekunde 43
+044E: 04 1B 04                     .db 00000100b,DCF_DOW,4     ; DCF-Sekunde 44
+0451: 06 1C 01                     .db 00000110b,DCF_MON,1     ; DCF-Sekunde 45
+0454: 04 1C 02                     .db 00000100b,DCF_MON,2     ; DCF-Sekunde 46
+0457: 04 1C 04                     .db 00000100b,DCF_MON,4     ; DCF-Sekunde 47
+045A: 04 1C 08                     .db 00000100b,DCF_MON,8     ; DCF-Sekunde 48
+045D: 04 1C 0A                     .db 00000100b,DCF_MON,10    ; DCF-Sekunde 49
+0460: 06 1D 01                     .db 00000110b,DCF_YR,1      ; DCF-Sekunde 50
+0463: 04 1D 02                     .db 00000100b,DCF_YR,2      ; DCF-Sekunde 51
+0466: 04 1D 04                     .db 00000100b,DCF_YR,4      ; DCF-Sekunde 52
+0469: 04 1D 08                     .db 00000100b,DCF_YR,8      ; DCF-Sekunde 53
+046C: 04 1D 0A                     .db 00000100b,DCF_YR,10     ; DCF-Sekunde 54
+046F: 04 1D 14                     .db 00000100b,DCF_YR,20     ; DCF-Sekunde 55
+0472: 04 1D 28                     .db 00000100b,DCF_YR,40     ; DCF-Sekunde 56
+0475: 04 1D 50                     .db 00000100b,DCF_YR,80     ; DCF-Sekunde 57
+0478: 10 00 00                     .db 00010000b,0,0           ; DCF-Sekunde 58
+047B: 00 00 00                     .db 00000000b,0,0           ; DCF-Sekunde 59
+                   
+                   ;               ********************************************
+                   ;               *** Tabelle für DCF77-Bereichsprüfung
+                   ;               ***
+                   ;               *** Satzaufbau:
+                   ;               ***  1. Adresse für Wertmerker
+                   ;               ***  2. Minimalwert
+                   ;               ***  3. Maximalwert
+                   ;               ********************************************
+                   
+047E: 18 00 3B     DCF_ValCheck:   .db DCF_MIN,0,59
+0481: 19 00 17                     .db DCF_HR,0,23
+0484: 1A 01 1F                     .db DCF_DAY,1,31
+0487: 1B 01 07                     .db DCF_DOW,1,7
+048A: 1C 01 0C                     .db DCF_MON,1,12
+048D: 1D 00 63                     .db DCF_YR,0,99
+                   
+                   ;               ********************************************
+                   ;               *** Daten für Anzeige
+                   ;               ********************************************
+                   
+0490: 74 20 7A 1A 
+      7A 2C 00     ScaleData:      .db 116,032,122,026,122,044,000
+0497: 83 1D 86 1A 
+      8C 1A 8F 1D 
+      8F 20 83 2C 
+      8F 2C 00                     .db 131,029,134,026,140,026,143,029,143,032,
+04A6: 86 D7 83 D4 
+      7D D4 7A D7 
+      7A E3 7D E6 
+      83 E6 86 E3 
+      86 E0                        .db 134,215,131,212,125,212,122,215,122,227,
+04B8: 83 DD 7D DD 
+      7A E0 00                     .db 131,221,125,221,122,224,000
+04BF: D6 7A D9 77 
+      DF 77 E2 7A 
+      E2 7D DF 80 
+      E2 83 E2 86 
+      DF 89                        .db 214,122,217,119,223,119,226,122,226,125,
+04D1: D9 89 D6 86 
+      00 D9 80 DF 
+      80 00                        .db 217,137,214,134,000,217,128,223,128,000
+04DB: 1D 86 20 89 
+      26 89 29 86 
+      29 7A 26 77 
+      20 77 1D 7A 
+      1D 7D                        .db 029,134,032,137,038,137,041,134,041,122,
+04ED: 20 80 26 80 
+      29 7D 00                     .db 032,128,038,128,041,125,000
+                   
+04F4: 6C B2 6C B0 
+      70 B0 70 B2 
+      6C B2 00 6C 
+      B6 6C B8 70 
+      B8 70 B6                     .db 108,178,108,176,112,176,112,178,108,178,
+0507: 6C B6 00                     .db 108,182,000
+050A: 90 B2 90 B0 
+      94 B0 94 B2 
+      90 B2 00 90 
+      B6 90 B8 94 
+      B8 94 B6                     .db 144,178,144,176,148,176,148,178,144,178,
+051D: 90 B6 00                     .db 144,182,000
+                   
+0520: 80 02 80 16 
+      00 8D 02 8C 
+      07 00 9A 04 
+      99 09 00 A6 
+      08 A5 0C 00 
+                                   .db 128,002,128,022,000,141,002,140,007,000,
+0534: B3 0C B1 11 
+      00 BF 12 BA 
+      1B 00 CA 1A 
+      C7 1E 00 D4 
+      22 D0 26 00 
+                                   .db 179,012,177,017,000,191,018,186,027,000,
+0548: DD 2B D9 2F 
+      00 E5 35 E1 
+      38 00 ED 41 
+      E4 46 00 F3 
+      4C EE 4E 00 
+                                   .db 221,043,217,047,000,229,053,225,056,000,
+055C: F7 59 F3 5A 
+      00 FB 65 F6 
+      66 00 FD 72 
+      F8 73 00 FD 
+      80 E9 80 00 
+                                   .db 247,089,243,090,000,251,101,246,102,000,
+0570: FD 8D F8 8C 
+      00 FB 9A F6 
+      99 00 F7 A6 
+      F3 A5 00 F3 
+      B3 EE B1 00 
+                                   .db 253,141,248,140,000,251,154,246,153,000,
+0584: ED BF E4 BA 
+      00 E5 CA E1 
+      C7 00 DD D4 
+      D9 D0 00 D4 
+      DD D0 D9 00 
+                                   .db 237,191,228,186,000,229,202,225,199,000,
+0598: CA E5 C7 E1 
+      00 BF ED BA 
+      E4 00 B3 F3 
+      B1 EE 00 A6 
+      F7 A5 F3 00 
+                                   .db 202,229,199,225,000,191,237,186,228,000,
+05AC: 9A FB 99 F6 
+      00 8D FD 8C 
+      F8 00 7F FD 
+      7F E9 00 72 
+      FD 73 F8 00 
+                                   .db 154,251,153,246,000,141,253,140,248,000,
+05C0: 65 FB 66 F6 
+      00 59 F7 5A 
+      F3 00 4C F3 
+      4E EE 00 41 
+      ED 46 E4 00 
+                                   .db 101,251,102,246,000,089,247,090,243,000,
+05D4: 35 E5 38 E1 
+      00 2B DD 2F 
+      D9 00 22 D4 
+      26 D0 00 1A 
+      CA 1E C7 00 
+                                   .db 053,229,056,225,000,043,221,047,217,000,
+05E8: 12 BE 1B B9 
+      00 0C B3 11 
+      B1 00 08 A6 
+      0C A5 00 04 
+      9A 09 99 00 
+                                   .db 018,190,027,185,000,012,179,017,177,000,
+05FC: 02 8D 07 8C 
+      00 02 7F 16 
+      7F 00 02 72 
+      07 73 00 04 
+      65 09 66 00 
+                                   .db 002,141,007,140,000,002,127,022,127,000,
+0610: 08 59 0C 5A 
+      00 0C 4C 11 
+      4E 00 12 41 
+      1B 46 00 1A 
+      35 1E 38 00 
+                                   .db 008,089,012,090,000,012,076,017,078,000,
+0624: 22 2B 26 2F 
+      00 2B 22 2F 
+      26 00 35 1A 
+      38 1E 00 40 
+      12 45 1B 00 
+                                   .db 034,043,038,047,000,043,034,047,038,000,
+0638: 4C 0C 4E 11 
+      00 59 08 5A 
+      0C 00 65 04 
+      66 09 00 72 
+      02 73 07 FF 
+                                   .db 076,012,078,017,000,089,008,090,012,000,
+                   
+064C: 80 1A 80 80 
+      FF 8A 1A 80 
+      80 FF 95 1C 
+      80 80 FF 9F 
+      1E 80 80 FF 
+                   SecPtrData:     .db 128,026,128,128,255,138,026,128,128,255,
+0660: A9 22 80 80 
+      FF B3 27 80 
+      80 FF BB 2D 
+      80 80 FF C4 
+      34 80 80 FF 
+                                   .db 169,034,128,128,255,179,039,128,128,255,
+0674: CB 3B 80 80 
+      FF D2 44 80 
+      80 FF D8 4D 
+      80 80 FF DD 
+      56 80 80 FF 
+                                   .db 203,059,128,128,255,210,068,128,128,255,
+0688: E1 60 80 80 
+      FF E3 6A 80 
+      80 FF E5 75 
+      80 80 FF E5 
+      80 80 80 FF 
+                                   .db 225,096,128,128,255,227,106,128,128,255,
+069C: E5 8A 80 80 
+      FF E3 95 80 
+      80 FF E1 9F 
+      80 80 FF DD 
+      A9 80 80 FF 
+                                   .db 229,138,128,128,255,227,149,128,128,255,
+06B0: D8 B3 80 80 
+      FF D2 BB 80 
+      80 FF CB C4 
+      80 80 FF C4 
+      CB 80 80 FF 
+                                   .db 216,179,128,128,255,210,187,128,128,255,
+06C4: BB D2 80 80 
+      FF B3 D8 80 
+      80 FF A9 DD 
+      80 80 FF 9F 
+      E1 80 80 FF 
+                                   .db 187,210,128,128,255,179,216,128,128,255,
+06D8: 95 E3 80 80 
+      FF 8A E5 80 
+      80 FF 7F E5 
+      80 80 FF 75 
+      E5 80 80 FF 
+                                   .db 149,227,128,128,255,138,229,128,128,255,
+06EC: 6A E3 80 80 
+      FF 60 E1 80 
+      80 FF 56 DD 
+      80 80 FF 4D 
+      D8 80 80 FF 
+                                   .db 106,227,128,128,255,096,225,128,128,255,
+0700: 44 D2 80 80 
+      FF 3B CB 80 
+      80 FF 34 C4 
+      80 80 FF 2D 
+      BB 80 80 FF 
+                                   .db 068,210,128,128,255,059,203,128,128,255,
+0714: 27 B2 80 80 
+      FF 22 A9 80 
+      80 FF 1E 9F 
+      80 80 FF 1C 
+      95 80 80 FF 
+                                   .db 039,178,128,128,255,034,169,128,128,255,
+0728: 1A 8A 80 80 
+      FF 1A 7F 80 
+      80 FF 1A 75 
+      80 80 FF 1C 
+      6A 80 80 FF 
+                                   .db 026,138,128,128,255,026,127,128,128,255,
+073C: 1E 60 80 80 
+      FF 22 56 80 
+      80 FF 27 4D 
+      80 80 FF 2D 
+      44 80 80 FF 
+                                   .db 030,096,128,128,255,034,086,128,128,255,
+0750: 34 3B 80 80 
+      FF 3B 34 80 
+      80 FF 44 2D 
+      80 80 FF 4C 
+      27 80 80 FF 
+                                   .db 052,059,128,128,255,059,052,128,128,255,
+0764: 56 22 80 80 
+      FF 60 1E 80 
+      80 FF 6A 1C 
+      80 80 FF 75 
+      1A 80 80 FF 
+                                   .db 086,034,128,128,255,096,030,128,128,255,
+                   
+0778: 8A 7F 80 1A 
+      76 7F 8A 7F 
+      FF 89 81 8A 
+      1A 76 7E 89 
+      81 FF        MinPtrData:     .db 138,127,128,026,118,127,138,127,255,137,
+078A: 89 82 95 1C 
+      76 7D 89 82 
+      FF 89 83 9F 
+      1E 76 7C 89 
+      83 FF                        .db 137,130,149,028,118,125,137,130,255,137,
+079C: 89 84 A9 22 
+      76 7B 89 84 
+      FF 88 85 B3 
+      27 77 7A 88 
+      85 FF                        .db 137,132,169,034,118,123,137,132,255,136,
+07AE: 88 85 BB 2D 
+      77 7A 88 85 
+      FF 87 86 C4 
+      34 78 79 87 
+      86 FF                        .db 136,133,187,045,119,122,136,133,255,135,
+07C0: 86 87 CB 3B 
+      79 78 86 87 
+      FF 85 88 D2 
+      44 7A 77 85 
+      88 FF                        .db 134,135,203,059,121,120,134,135,255,133,
+07D2: 84 88 D8 4D 
+      7B 77 84 88 
+      FF 84 89 DD 
+      56 7B 76 84 
+      89 FF                        .db 132,136,216,077,123,119,132,136,255,132,
+07E4: 83 89 E1 60 
+      7C 76 83 89 
+      FF 82 89 E3 
+      6A 7D 76 82 
+      89 FF                        .db 131,137,225,096,124,118,131,137,255,130,
+07F6: 81 89 E5 75 
+      7E 76 81 89 
+      FF 7F 89 E5 
+      80 80 76 7F 
+      89 FF                        .db 129,137,229,117,126,118,129,137,255,127,
+0808: 7E 89 E5 8A 
+      81 76 7E 89 
+      FF 7D 89 E3 
+      95 82 76 7D 
+      89 FF                        .db 126,137,229,138,129,118,126,137,255,125,
+081A: 7C 89 E1 9F 
+      83 76 7C 89 
+      FF 7B 89 DD 
+      A9 84 76 7B 
+      89 FF                        .db 124,137,225,159,131,118,124,137,255,123,
+082C: 7A 88 D8 B3 
+      85 77 7A 88 
+      FF 7A 88 D2 
+      BB 85 77 7A 
+      88 FF                        .db 122,136,216,179,133,119,122,136,255,122,
+083E: 79 87 CB C4 
+      86 78 79 87 
+      FF 78 86 C4 
+      CB 87 79 78 
+      86 FF                        .db 121,135,203,196,134,120,121,135,255,120,
+0850: 77 85 BB D2 
+      88 7A 77 85 
+      FF 77 85 B3 
+      D8 88 7A 77 
+      85 FF                        .db 119,133,187,210,136,122,119,133,255,119,
+0862: 76 84 A9 DD 
+      89 7B 76 84 
+      FF 76 83 9F 
+      E1 89 7C 76 
+      83 FF                        .db 118,132,169,221,137,123,118,132,255,118,
+0874: 76 82 95 E3 
+      89 7D 76 82 
+      FF 76 81 8A 
+      E5 89 7E 76 
+      81 FF                        .db 118,130,149,227,137,125,118,130,255,118,
+0886: 76 7F 7F E5 
+      89 80 76 7F 
+      FF 76 7E 75 
+      E5 89 81 76 
+      7E FF                        .db 118,127,127,229,137,128,118,127,255,118,
+0898: 76 7D 6A E3 
+      89 82 76 7D 
+      FF 76 7C 60 
+      E1 89 83 76 
+      7C FF                        .db 118,125,106,227,137,130,118,125,255,118,
+08AA: 76 7B 56 DD 
+      89 84 76 7B 
+      FF 77 7B 4D 
+      D8 88 84 77 
+      7B FF                        .db 118,123,086,221,137,132,118,123,255,119,
+08BC: 77 7A 44 D2 
+      88 85 77 7A 
+      FF 78 79 3B 
+      CB 87 86 78 
+      79 FF                        .db 119,122,068,210,136,133,119,122,255,120,
+08CE: 79 78 34 C4 
+      86 87 79 78 
+      FF 7A 77 2D 
+      BB 85 88 7A 
+      77 FF                        .db 121,120,052,196,134,135,121,120,255,122,
+08E0: 7B 77 27 B2 
+      84 88 7B 77 
+      FF 7B 76 22 
+      A9 84 89 7B 
+      76 FF                        .db 123,119,039,178,132,136,123,119,255,123,
+08F2: 7C 76 1E 9F 
+      83 89 7C 76 
+      FF 7D 76 1C 
+      95 82 89 7D 
+      76 FF                        .db 124,118,030,159,131,137,124,118,255,125,
+0904: 7E 76 1A 8A 
+      81 89 7E 76 
+      FF 80 76 1A 
+      7F 7F 89 80 
+      76 FF                        .db 126,118,026,138,129,137,126,118,255,128,
+0916: 81 76 1A 75 
+      7E 89 81 76 
+      FF 82 76 1C 
+      6A 7D 89 82 
+      76 FF                        .db 129,118,026,117,126,137,129,118,255,130,
+0928: 83 76 1E 60 
+      7C 89 83 76 
+      FF 84 76 22 
+      56 7B 89 84 
+      76 FF                        .db 131,118,030,096,124,137,131,118,255,132,
+093A: 84 77 27 4D 
+      7B 88 84 77 
+      FF 85 77 2D 
+      44 7A 88 85 
+      77 FF                        .db 132,119,039,077,123,136,132,119,255,133,
+094C: 86 78 34 3B 
+      79 87 86 78 
+      FF 87 79 3B 
+      34 78 86 87 
+      79 FF                        .db 134,120,052,059,121,135,134,120,255,135,
+095E: 88 7A 44 2D 
+      77 85 88 7A 
+      FF 88 7A 4C 
+      27 77 85 88 
+      7A FF                        .db 136,122,068,045,119,133,136,122,255,136,
+0970: 89 7B 56 22 
+      76 84 89 7B 
+      FF 89 7C 60 
+      1E 76 83 89 
+      7C FF                        .db 137,123,086,034,118,132,137,123,255,137,
+0982: 89 7D 6A 1C 
+      76 82 89 7D 
+      FF 89 7E 75 
+      1A 76 81 89 
+      7E FF                        .db 137,125,106,028,118,130,137,125,255,137,
+                   
+0994: 8A 7F 80 44 
+      76 7F 8A 7F 
+      FF 89 81 86 
+      44 76 7E 89 
+      81 FF        HrPtrData:      .db 138,127,128,068,118,127,138,127,255,137,
+09A6: 89 82 8C 45 
+      76 7D 89 82 
+      FF 89 83 92 
+      46 76 7C 89 
+      83 FF                        .db 137,130,140,069,118,125,137,130,255,137,
+09B8: 89 84 98 49 
+      76 7B 89 84 
+      FF 88 85 9E 
+      4C 77 7A 88 
+      85 FF                        .db 137,132,152,073,118,123,137,132,255,136,
+09CA: 88 85 A3 4F 
+      77 7A 88 85 
+      FF 87 86 A8 
+      53 78 79 87 
+      86 FF                        .db 136,133,163,079,119,122,136,133,255,135,
+09DC: 86 87 AC 57 
+      79 78 86 87 
+      FF 85 88 B0 
+      5C 7A 77 85 
+      88 FF                        .db 134,135,172,087,121,120,134,135,255,133,
+09EE: 84 88 B3 62 
+      7B 77 84 88 
+      FF 84 89 B6 
+      67 7B 76 84 
+      89 FF                        .db 132,136,179,098,123,119,132,136,255,132,
+0A00: 83 89 B9 6D 
+      7C 76 83 89 
+      FF 82 89 BA 
+      73 7D 76 82 
+      89 FF                        .db 131,137,185,109,124,118,131,137,255,130,
+0A12: 81 89 BB 79 
+      7E 76 81 89 
+      FF 7F 89 BB 
+      80 80 76 7F 
+      89 FF                        .db 129,137,187,121,126,118,129,137,255,127,
+0A24: 7E 89 BB 86 
+      81 76 7E 89 
+      FF 7D 89 BA 
+      8C 82 76 7D 
+      89 FF                        .db 126,137,187,134,129,118,126,137,255,125,
+0A36: 7C 89 B9 92 
+      83 76 7C 89 
+      FF 7B 89 B6 
+      98 84 76 7B 
+      89 FF                        .db 124,137,185,146,131,118,124,137,255,123,
+0A48: 7A 88 B3 9E 
+      85 77 7A 88 
+      FF 7A 88 B0 
+      A3 85 77 7A 
+      88 FF                        .db 122,136,179,158,133,119,122,136,255,122,
+0A5A: 79 87 AC A8 
+      86 78 79 87 
+      FF 78 86 A8 
+      AC 87 79 78 
+      86 FF                        .db 121,135,172,168,134,120,121,135,255,120,
+0A6C: 77 85 A3 B0 
+      88 7A 77 85 
+      FF 77 85 9E 
+      B3 88 7A 77 
+      85 FF                        .db 119,133,163,176,136,122,119,133,255,119,
+0A7E: 76 84 98 B6 
+      89 7B 76 84 
+      FF 76 83 92 
+      B9 89 7C 76 
+      83 FF                        .db 118,132,152,182,137,123,118,132,255,118,
+0A90: 76 82 8C BA 
+      89 7D 76 82 
+      FF 76 81 86 
+      BB 89 7E 76 
+      81 FF                        .db 118,130,140,186,137,125,118,130,255,118,
+0AA2: 76 7F 7F BB 
+      89 80 76 7F 
+      FF 76 7E 79 
+      BB 89 81 76 
+      7E FF                        .db 118,127,127,187,137,128,118,127,255,118,
+0AB4: 76 7D 73 BA 
+      89 82 76 7D 
+      FF 76 7C 6D 
+      B9 89 83 76 
+      7C FF                        .db 118,125,115,186,137,130,118,125,255,118,
+0AC6: 76 7B 67 B6 
+      89 84 76 7B 
+      FF 77 7B 62 
+      B3 88 84 77 
+      7B FF                        .db 118,123,103,182,137,132,118,123,255,119,
+0AD8: 77 7A 5C B0 
+      88 85 77 7A 
+      FF 78 79 57 
+      AC 87 86 78 
+      79 FF                        .db 119,122,092,176,136,133,119,122,255,120,
+0AEA: 79 78 53 A8 
+      86 87 79 78 
+      FF 7A 77 4F 
+      A3 85 88 7A 
+      77 FF                        .db 121,120,083,168,134,135,121,120,255,122,
+0AFC: 7B 77 4C 9D 
+      84 88 7B 77 
+      FF 7B 76 49 
+      98 84 89 7B 
+      76 FF                        .db 123,119,076,157,132,136,123,119,255,123,
+0B0E: 7C 76 46 92 
+      83 89 7C 76 
+      FF 7D 76 45 
+      8C 82 89 7D 
+      76 FF                        .db 124,118,070,146,131,137,124,118,255,125,
+0B20: 7E 76 44 86 
+      81 89 7E 76 
+      FF 80 76 44 
+      7F 7F 89 80 
+      76 FF                        .db 126,118,068,134,129,137,126,118,255,128,
+0B32: 81 76 44 79 
+      7E 89 81 76 
+      FF 82 76 45 
+      73 7D 89 82 
+      76 FF                        .db 129,118,068,121,126,137,129,118,255,130,
+0B44: 83 76 46 6D 
+      7C 89 83 76 
+      FF 84 76 49 
+      67 7B 89 84 
+      76 FF                        .db 131,118,070,109,124,137,131,118,255,132,
+0B56: 84 77 4C 62 
+      7B 88 84 77 
+      FF 85 77 4F 
+      5C 7A 88 85 
+      77 FF                        .db 132,119,076,098,123,136,132,119,255,133,
+0B68: 86 78 53 57 
+      79 87 86 78 
+      FF 87 79 57 
+      53 78 86 87 
+      79 FF                        .db 134,120,083,087,121,135,134,120,255,135,
+0B7A: 88 7A 5C 4F 
+      77 85 88 7A 
+      FF 88 7A 61 
+      4C 77 85 88 
+      7A FF                        .db 136,122,092,079,119,133,136,122,255,136,
+0B8C: 89 7B 67 49 
+      76 84 89 7B 
+      FF 89 7C 6D 
+      46 76 83 89 
+      7C FF                        .db 137,123,103,073,118,132,137,123,255,137,
+0B9E: 89 7D 73 45 
+      76 82 89 7D 
+      FF 89 7E 79 
+      44 76 81 89 
+      7E FF                        .db 137,125,115,069,118,130,137,125,255,137,
+                   
+0BB0: 0B C4 0B D7 
+      0B DE 0B ED 
+      0C 09        NumSecOnes:     .dw NumSecOnes0,NumSecOnes1,NumSecOnes2,NumS
+0BBA: 0C 12 0C 27 
+      0C 40 0C 4B 
+      0C 6C                        .dw NumSecOnes5,NumSecOnes6,NumSecOnes7,NumS
+0BC4: A6 B0 A8 AE 
+      AC AE AE B0 
+      AE B8 AC BA 
+      A8 BA A6 B8 
+      A6 B0        NumSecOnes0:    .db 166,176,168,174,172,174,174,176,174,184,
+0BD6: FF                           .db 255
+0BD7: A8 B2 AC AE 
+      AC BA FF     NumSecOnes1:    .db 168,178,172,174,172,186,255
+0BDE: A6 B0 A8 AE 
+      AC AE AE B0 
+      AE B2 A6 BA 
+      AE BA FF     NumSecOnes2:    .db 166,176,168,174,172,174,174,176,174,178,
+0BED: A6 B0 A8 AE 
+      AC AE AE B0 
+      AE B2 AC B4 
+      AE B6 AE B8 
+      AC BA        NumSecOnes3:    .db 166,176,168,174,172,174,174,176,174,178,
+0BFF: A8 BA A6 B8 
+      00 A8 B4 AC 
+      B4 FF                        .db 168,186,166,184,000,168,180,172,180,255
+0C09: AE B4 A6 B4 
+      AC AE AC BA 
+      FF           NumSecOnes4:    .db 174,180,166,180,172,174,172,186,255
+0C12: AE AE A6 AE 
+      A6 B6 A8 B4 
+      AC B4 AE B6 
+      AE B8 AC BA 
+      A8 BA        NumSecOnes5:    .db 174,174,166,174,166,182,168,180,172,180,
+0C24: A6 B8 FF                     .db 166,184,255
+0C27: AE B0 AC AE 
+      A8 AE A6 B0 
+      A6 B8 A8 BA 
+      AC BA AE B8 
+      AE B6        NumSecOnes6:    .db 174,176,172,174,168,174,166,176,166,184,
+0C39: AC B4 A8 B4 
+      A6 B6 FF                     .db 172,180,168,180,166,182,255
+0C40: A6 AE AE AE 
+      AE B0 AA B4 
+      AA BA FF     NumSecOnes7:    .db 166,174,174,174,174,176,170,180,170,186,
+0C4B: A8 B4 A6 B2 
+      A6 B0 A8 AE 
+      AC AE AE B0 
+      AE B2 AC B4 
+      A8 B4        NumSecOnes8:    .db 168,180,166,178,166,176,168,174,172,174,
+0C5D: A6 B6 A6 B8 
+      A8 BA AC BA 
+      AE B8 AE B6 
+      AC B4 FF                     .db 166,182,166,184,168,186,172,186,174,184,
+0C6C: A6 B8 A8 BA 
+      AC BA AE B8 
+      AE B0 AC AE 
+      A8 AE A6 B0 
+      A6 B2        NumSecOnes9:    .db 166,184,168,186,172,186,174,184,174,176,
+0C7E: A8 B4 AC B4 
+      AE B2 FF                     .db 168,180,172,180,174,178,255
+                   
+0C85: 0C 91 0C A4 
+      0C AB 0C BA 
+      0C D6 0C DF 
+                   NumSecTens:     .dw NumSecTens0,NumSecTens1,NumSecTens2,NumS
+0C91: 9A B0 9C AE 
+      A0 AE A2 B0 
+      A2 B8 A0 BA 
+      9C BA 9A B8 
+      9A B0        NumSecTens0:    .db 154,176,156,174,160,174,162,176,162,184,
+0CA3: FF                           .db 255
+0CA4: 9C B2 A0 AE 
+      A0 BA FF     NumSecTens1:    .db 156,178,160,174,160,186,255
+0CAB: 9A B0 9C AE 
+      A0 AE A2 B0 
+      A2 B2 9A BA 
+      A2 BA FF     NumSecTens2:    .db 154,176,156,174,160,174,162,176,162,178,
+0CBA: 9A B0 9C AE 
+      A0 AE A2 B0 
+      A2 B2 A0 B4 
+      A2 B6 A2 B8 
+      A0 BA        NumSecTens3:    .db 154,176,156,174,160,174,162,176,162,178,
+0CCC: 9C BA 9A B8 
+      00 9C B4 A0 
+      B4 FF                        .db 156,186,154,184,000,156,180,160,180,255
+0CD6: A2 B4 9A B4 
+      A0 AE A0 BA 
+      FF           NumSecTens4:    .db 162,180,154,180,160,174,160,186,255
+0CDF: A2 AE 9A AE 
+      9A B6 9C B4 
+      A0 B4 A2 B6 
+      A2 B8 A0 BA 
+      9C BA        NumSecTens5:    .db 162,174,154,174,154,182,156,180,160,180,
+0CF1: 9A B8 FF                     .db 154,184,255
+                   
+0CF4: 0D 08 0D 1B 
+      0D 22 0D 31 
+      0D 4D        NumMinOnes:     .dw NumMinOnes0,NumMinOnes1,NumMinOnes2,NumM
+0CFE: 0D 56 0D 6B 
+      0D 84 0D 8F 
+      0D B0                        .dw NumMinOnes5,NumMinOnes6,NumMinOnes7,NumM
+0D08: 82 B0 84 AE 
+      88 AE 8A B0 
+      8A B8 88 BA 
+      84 BA 82 B8 
+      82 B0        NumMinOnes0:    .db 130,176,132,174,136,174,138,176,138,184,
+0D1A: FF                           .db 255
+0D1B: 84 B2 88 AE 
+      88 BA FF     NumMinOnes1:    .db 132,178,136,174,136,186,255
+0D22: 82 B0 84 AE 
+      88 AE 8A B0 
+      8A B2 82 BA 
+      8A BA FF     NumMinOnes2:    .db 130,176,132,174,136,174,138,176,138,178,
+0D31: 82 B0 84 AE 
+      88 AE 8A B0 
+      8A B2 88 B4 
+      8A B6 8A B8 
+      88 BA        NumMinOnes3:    .db 130,176,132,174,136,174,138,176,138,178,
+0D43: 84 BA 82 B8 
+      00 84 B4 88 
+      B4 FF                        .db 132,186,130,184,000,132,180,136,180,255
+0D4D: 8A B4 82 B4 
+      88 AE 88 BA 
+      FF           NumMinOnes4:    .db 138,180,130,180,136,174,136,186,255
+0D56: 8A AE 82 AE 
+      82 B6 84 B4 
+      88 B4 8A B6 
+      8A B8 88 BA 
+      84 BA        NumMinOnes5:    .db 138,174,130,174,130,182,132,180,136,180,
+0D68: 82 B8 FF                     .db 130,184,255
+0D6B: 8A B0 88 AE 
+      84 AE 82 B0 
+      82 B8 84 BA 
+      88 BA 8A B8 
+      8A B6        NumMinOnes6:    .db 138,176,136,174,132,174,130,176,130,184,
+0D7D: 88 B4 84 B4 
+      82 B6 FF                     .db 136,180,132,180,130,182,255
+0D84: 82 AE 8A AE 
+      8A B0 86 B4 
+      86 BA FF     NumMinOnes7:    .db 130,174,138,174,138,176,134,180,134,186,
+0D8F: 84 B4 82 B2 
+      82 B0 84 AE 
+      88 AE 8A B0 
+      8A B2 88 B4 
+      84 B4        NumMinOnes8:    .db 132,180,130,178,130,176,132,174,136,174,
+0DA1: 82 B6 82 B8 
+      84 BA 88 BA 
+      8A B8 8A B6 
+      88 B4 FF                     .db 130,182,130,184,132,186,136,186,138,184,
+0DB0: 82 B8 84 BA 
+      88 BA 8A B8 
+      8A B0 88 AE 
+      84 AE 82 B0 
+      82 B2        NumMinOnes9:    .db 130,184,132,186,136,186,138,184,138,176,
+0DC2: 84 B4 88 B4 
+      8A B2 FF                     .db 132,180,136,180,138,178,255
+                   
+0DC9: 0D D5 0D E8 
+      0D EF 0D FE 
+      0E 1A 0E 23 
+                   NumMinTens:     .dw NumMinTens0,NumMinTens1,NumMinTens2,NumM
+0DD5: 76 B0 78 AE 
+      7C AE 7E B0 
+      7E B8 7C BA 
+      78 BA 76 B8 
+      76 B0        NumMinTens0:    .db 118,176,120,174,124,174,126,176,126,184,
+0DE7: FF                           .db 255
+0DE8: 78 B2 7C AE 
+      7C BA FF     NumMinTens1:    .db 120,178,124,174,124,186,255
+0DEF: 76 B0 78 AE 
+      7C AE 7E B0 
+      7E B2 76 BA 
+      7E BA FF     NumMinTens2:    .db 118,176,120,174,124,174,126,176,126,178,
+0DFE: 76 B0 78 AE 
+      7C AE 7E B0 
+      7E B2 7C B4 
+      7E B6 7E B8 
+      7C BA        NumMinTens3:    .db 118,176,120,174,124,174,126,176,126,178,
+0E10: 78 BA 76 B8 
+      00 78 B4 7C 
+      B4 FF                        .db 120,186,118,184,000,120,180,124,180,255
+0E1A: 7E B4 76 B4 
+      7C AE 7C BA 
+      FF           NumMinTens4:    .db 126,180,118,180,124,174,124,186,255
+0E23: 7E AE 76 AE 
+      76 B6 78 B4 
+      7C B4 7E B6 
+      7E B8 7C BA 
+      78 BA        NumMinTens5:    .db 126,174,118,174,118,182,120,180,124,180,
+0E35: 76 B8 FF                     .db 118,184,255
+                   
+0E38: 0E 4C 0E 5F 
+      0E 66 0E 75 
+      0E 91        NumHrOnes:      .dw NumHrOnes0,NumHrOnes1,NumHrOnes2,NumHrOn
+0E42: 0E 9A 0E AF 
+      0E C8 0E D3 
+      0E F4                        .dw NumHrOnes5,NumHrOnes6,NumHrOnes7,NumHrOn
+0E4C: 5E B0 60 AE 
+      64 AE 66 B0 
+      66 B8 64 BA 
+      60 BA 5E B8 
+      5E B0        NumHrOnes0:     .db 094,176,096,174,100,174,102,176,102,184,
+0E5E: FF                           .db 255
+0E5F: 60 B2 64 AE 
+      64 BA FF     NumHrOnes1:     .db 096,178,100,174,100,186,255
+0E66: 5E B0 60 AE 
+      64 AE 66 B0 
+      66 B2 5E BA 
+      66 BA FF     NumHrOnes2:     .db 094,176,096,174,100,174,102,176,102,178,
+0E75: 5E B0 60 AE 
+      64 AE 66 B0 
+      66 B2 64 B4 
+      66 B6 66 B8 
+      64 BA        NumHrOnes3:     .db 094,176,096,174,100,174,102,176,102,178,
+0E87: 60 BA 5E B8 
+      00 60 B4 64 
+      B4 FF                        .db 096,186,094,184,000,096,180,100,180,255
+0E91: 66 B4 5E B4 
+      64 AE 64 BA 
+      FF           NumHrOnes4:     .db 102,180,094,180,100,174,100,186,255
+0E9A: 66 AE 5E AE 
+      5E B6 60 B4 
+      64 B4 66 B6 
+      66 B8 64 BA 
+      60 BA        NumHrOnes5:     .db 102,174,094,174,094,182,096,180,100,180,
+0EAC: 5E B8 FF                     .db 094,184,255
+0EAF: 66 B0 64 AE 
+      60 AE 5E B0 
+      5E B8 60 BA 
+      64 BA 66 B8 
+      66 B6        NumHrOnes6:     .db 102,176,100,174,096,174,094,176,094,184,
+0EC1: 64 B4 60 B4 
+      5E B6 FF                     .db 100,180,096,180,094,182,255
+0EC8: 5E AE 66 AE 
+      66 B0 62 B4 
+      62 BA FF     NumHrOnes7:     .db 094,174,102,174,102,176,098,180,098,186,
+0ED3: 60 B4 5E B2 
+      5E B0 60 AE 
+      64 AE 66 B0 
+      66 B2 64 B4 
+      60 B4        NumHrOnes8:     .db 096,180,094,178,094,176,096,174,100,174,
+0EE5: 5E B6 5E B8 
+      60 BA 64 BA 
+      66 B8 66 B6 
+      64 B4 FF                     .db 094,182,094,184,096,186,100,186,102,184,
+0EF4: 5E B8 60 BA 
+      64 BA 66 B8 
+      66 B0 64 AE 
+      60 AE 5E B0 
+      5E B2        NumHrOnes9:     .db 094,184,096,186,100,186,102,184,102,176,
+0F06: 60 B4 64 B4 
+      66 B2 FF                     .db 096,180,100,180,102,178,255
+                   
+0F0D: 0F 13 0F 26 
+      0F 2D        NumHrTens:      .dw NumHrTens0,NumHrTens1,NumHrTens2
+0F13: 52 B0 54 AE 
+      58 AE 5A B0 
+      5A B8 58 BA 
+      54 BA 52 B8 
+      52 B0        NumHrTens0:     .db 082,176,084,174,088,174,090,176,090,184,
+0F25: FF                           .db 255
+0F26: 54 B2 58 AE 
+      58 BA FF     NumHrTens1:     .db 084,178,088,174,088,186,255
+0F2D: 52 B0 54 AE 
+      58 AE 5A B0 
+      5A B2 52 BA 
+      5A BA FF     NumHrTens2:     .db 082,176,084,174,088,174,090,176,090,178,
+                   
+0F3C: 0F 42 0F 4B 
+      0F 54        DCFStats:      .dw DCFStat0,DCFStat1,DCFStat2
+0F42: 7A 4C 7D 49 
+      83 4F 86 4C 
+      FF           DCFStat0:       .db 122,076,125,073,131,079,134,076,255
+0F4B: 7D 52 80 46 
+      83 52 7D 52 
+      FF           DCFStat1:       .db 125,082,128,070,131,082,125,082,255
+0F54: 7D 52 80 46 
+      83 52 7D 52 
+      00 7D 4C 7A 
+      49 7A 46 7D 
+      43 83 43     DCFStat2:       .db 125,082,128,070,131,082,125,082,000,125,
+0F67: 86 46 86 49 
+      83 4C FF                     .db 134,070,134,073,131,076,255
+                   

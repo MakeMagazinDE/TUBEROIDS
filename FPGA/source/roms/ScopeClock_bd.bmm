@@ -1,0 +1,29 @@
+// BMM LOC annotation file.
+//
+// Release 10.1i - Data2MEM K.37, build 1.5.7 Nov 8, 2007
+// Copyright (c) 1995-2008 Xilinx, Inc.  All rights reserved.
+//
+// Created on 07/11/08 02:12 pm
+//
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Unnamed 405 PPC processor, ID 0, memory map.
+//
+///////////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// Address space 'ram_cntlr' 0x00000000:0x00000FFF (4 KB).
+//
+///////////////////////////////////////////////////////////////////////////////
+
+ADDRESS_SPACE ram_cntlr RAMB16 [0x00000000:0x00000FFF]
+    BUS_BLOCK
+        MPU4051/rom/rom1.inst [7:4] PLACED = X1Y0;
+        MPU4051/rom/rom0.inst [3:0] PLACED = X1Y1;
+    END_BUS_BLOCK;
+END_ADDRESS_SPACE;
+

@@ -1,0 +1,2122 @@
+                       1    ;               *****************************************************************************
+                       2    ;               *** 8031-Software für ScopeClock-Hardware
+                       3    ;               ***
+                       4    ;               *** (c) 2004 by Sascha Ittner (GPL)
+                       5    ;               ***
+                       6    ;               *** 24.10.2004: V1.0
+                       7    ;               ***             Erste veröffentliche Version
+                       8    ;               *****************************************************************************
+                       9    ;               *** Modifizierte Version für AT89LP4052 16MHz
+                      10    ;               *** 8051 MetaLink Cross Assembler Version
+                      11    ;               *** 13.06.2006: V1.0.4052.0
+                      12    ;               *** Copyright (C) 2006 by Erhard Schemainda
+                      13    ;               *****************************************************************************
+                      14    
+                      15    ;                ---------------------------------------------------------------------------
+                      16    ;               |  This program is free software; you can redistribute it and/or modify     |
+                      17    ;               |  it under the terms of the GNU General Public License as published by     |
+                      18    ;               |  the Free Software Foundation; either version 2 of the License, or        |
+                      19    ;               |  at your option) any later version.                                       |
+                      20    ;               |                                                                           |           
+                                                                                           
+                      21    ;               |  This program is distributed in the hope that it will be useful,          |
+                      22    ;               |  but WITHOUT ANY WARRANTY; without even the implied warranty of           |
+                      23    ;               |  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the             |
+                      24    ;               |  GNU General Public License for more details.                             |
+                      25    ;               |                                                                           |           
+                                                                                       
+                      26    ;               |  You should have received a copy of the GNU General Public License        |
+                      27    ;               |  along with this program; if not, write to the Free Software              |
+                      28    ;               |  Foundation, inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA  |
+                      29    ;                ---------------------------------------------------------------------------
+                      30    
+                      31    ;               *****************************************************************************
+                      32    ;               ***   References:
+                      33    ;               *****************************************************************************
+                      34    ;               ***   (1) MetaLink Corporation, Chandler, Arizona
+                      35    ;               ***   (2) ATMEL AT89LP2052/4052 8 bit Microcontroler with 2K/4K bytes Flash
+                      36    ;               ***   (3) ATMEL Migrating from AT89C2051/C4051 to AT89LP2052/4052 Application
+                      37    ;               ***       Note 3573A-MCU-7/05
+                      38    ;               ***   (4) ATMEL AT89ISP Programmer Cable - Application Note 3310D-MICRO-6/05
+                      39    ;               ***   (5) ATMEL Microcontroller ISP Software, User's Manual
+                      40    ;               ***   (6) GMS AT89LP2052 / AT89LP4052 Parallel Port SPI Programmer V1
+                      41    ;               *****************************************************************************
+                      42    
+                      43    ;               *****************************************************************************
+                      44    ;               ***   Changes:
+                      45    ;               *****************************************************************************
+                      46    ;               ***
+                      47    ;               *** 22.05.2005 Strahl aus vor Delay-Loop                
+                      48    ;               ***            Delay nach Zeichnen Bresemham-Vector eingeführt           
+                      49    ;               ***                                                     
+                      50    ;               *** 26.05.2005 GPL-Banner eingefügt
+                      51    ;               ***
+                      52    ;               *** 02.06.2006 Quellcode auf MetaLink ASM51 Syntax umgestellt
+                      53    ;               *** 02.06.2006 Anpassung an AT89LP4052 Prozessor:        
+                      54    ;               ***            Port P1 und P3 auf 8051 Modus eingestellt                                
+                                                                                               
+                      55    ;               ***            Beam Delay Zeiten angepaßt                                         
+                      56    ;               ***            Timer0 aufgrund höherer Zählfrequenz (1 count/cycle) geändert            
+                                                                                               
+                      57    ;               ***                                                     
+                      58    ;               ***                                                     
+                      59    ;               ***                                                     
+                      60    ;               *****************************************************************************
+                      61    
+                      62    ;               *****************************************************************************
+                      63    ;               ***    Primary controls
+                      64    ;               *****************************************************************************
+                      65    
+                      66    $MOD52LP
+                =1    67    $INCLUDE(SYM52LP.inc)
+                =1    68    ;Most recent symbols for non addressable bits for the AT89LPx052 processor
+                =1    69    $NOLIST
+                      95    $LIST
+                      96    $TITLE(ScopeClock by Sascha Ittner, modified Version AT89LP4052 16MHz)
+                      97    $PAGEWIDTH(132)
+                      98    $NODEBUG
+                      99    $OBJECT
+                     100    $NOPAGING
+                     101    ;               *****************************************************************************
+                     102    ;               ***   Variables declaration
+                     103    ;               *****************************************************************************
+                     104    
+  0032               105    TICKS_HZ        EQU   50
+                     106    
+  003C               107    DCF_SYNCTIME    EQU   60
+  0008               108    DCF_HITIME      EQU   8
+  0003               109    DCF_MINTIME     EQU   3
+  000E               110    DCF_MAXTIME     EQU   14
+                     111                    
+  0032               112    KEY_DELAY       EQU   50
+  000C               113    KEY_REPEAT      EQU   12
+                     114    
+  00C8               115    BEAM_OFF_DLY_1  EQU   200          ; = 75µsec (15us = 40)                             geä. LP
+  00C8               116    BEAM_ON_DLY_1   EQU   200          ;                                                  geä. LP
+  0012               117    DRAW_DLY        EQU   18           ; = 4.5µsec (1.5us = 4)                            geä. LP  
+                     118    
+  0048               119    INIT_STACK      EQU   048h
+                     120    
+  000B               121    DISP_TAB_LEN    EQU   11
+  0030               122    DISP_TAB        EQU   030h
+  0030               123    DISP_TAB_SECPL  EQU   030h
+  0031               124    DISP_TAB_SECPH  EQU   031h
+  0032               125    DISP_TAB_MINPL  EQU   032h
+  0033               126    DISP_TAB_MINPH  EQU   033h
+  0034               127    DISP_TAB_HRPL   EQU   034h
+  0035               128    DISP_TAB_HRPH   EQU   035h
+  0036               129    DISP_TAB_SECNOL EQU   036h
+  0037               130    DISP_TAB_SECNOH EQU   037h
+  0038               131    DISP_TAB_SECNTL EQU   038h
+  0039               132    DISP_TAB_SECNTH EQU   039h
+  003A               133    DISP_TAB_MINNOL EQU   03Ah
+  003B               134    DISP_TAB_MINNOH EQU   03Bh
+  003C               135    DISP_TAB_MINNTL EQU   03Ch
+  003D               136    DISP_TAB_MINNTH EQU   03Dh
+  003E               137    DISP_TAB_HRNOL  EQU   03Eh
+  003F               138    DISP_TAB_HRNOH  EQU   03Fh
+  0040               139    DISP_TAB_HRNTL  EQU   040h
+  0041               140    DISP_TAB_HRNTH  EQU   041h
+  0042               141    DISP_TAB_DCFSL  EQU   042h
+  0043               142    DISP_TAB_DCFSH  EQU   043h
+  0044               143    DISP_TAB_SCALEL EQU   044h
+  0045               144    DISP_TAB_SCALEH EQU   045h
+  0046               145    TimerDly        EQU   046h         ;                                                   ins LP
+                     146    
+  0000               147    DLINE_R0        EQU   000h
+  0001               148    DLINE_R1        EQU   001h
+  0002               149    DLINE_R2        EQU   002h
+  0003               150    DLINE_R3        EQU   003h
+  0004               151    DLINE_R4        EQU   004h
+  0005               152    DLINE_R5        EQU   005h
+  0006               153    DLINE_R6        EQU   006h
+  0007               154    DLINE_R7        EQU   007h
+                     155    
+  0008               156    TIME_R0         EQU   008h
+  0009               157    TIME_R1         EQU   009h
+  000A               158    TIME_R2         EQU   00Ah
+  000B               159    TIME_R3         EQU   00Bh
+  000C               160    TIME_R4         EQU   00Ch
+  000D               161    TIME_R5         EQU   00Dh
+                     162    
+  0010               163    DCF_R0          EQU   010h
+  0011               164    DCF_R1          EQU   011h
+  0012               165    DCF_R2          EQU   012h
+  0013               166    DCF_R3          EQU   013h
+  0014               167    DCF_R4          EQU   014h
+  0015               168    DCF_R5          EQU   015h
+                     169    
+  0018               170    DCF_MIN         EQU   018h
+  0019               171    DCF_HR          EQU   019h
+  001A               172    DCF_DAY         EQU   01Ah
+  001B               173    DCF_DOW         EQU   01Bh
+  001C               174    DCF_MON         EQU   01Ch
+  001D               175    DCF_YR          EQU   01Dh
+                     176    
+  0020               177    DLINE_FLAGS     EQU   020h         ; Bits 00-07
+  0000               178    DLINE_F_XDIR    EQU   000h
+  0001               179    DLINE_F_YDIR    EQU   001h
+  0002               180    DLINE_F_SWXY    EQU   002h
+  0003               181    DLINE_F_ENEG    EQU   003h
+                     182    
+  0021               183    TIME_FLAGS      EQU   021h         ; Bits 08-0f
+  0008               184    TIME_F_UPDD     EQU   008h
+  0009               185    TIME_F_ADCH     EQU   009h
+  000A               186    TIME_F_KEYREP   EQU   00Ah
+  000B               187    TIME_F_SYNC     EQU   00Bh
+                     188    
+  0022               189    DCF_FLAGS       EQU   022h         ; Bits 10-17
+  0010               190    DCF_F_FE        EQU   010h
+  0011               191    DCF_F_BIT       EQU   011h
+  0012               192    DCF_F_PARITY    EQU   012h
+  0013               193    DCF_F_TIMEOK    EQU   013h
+  0014               194    DCF_F_STATDATA  EQU   014h
+  0015               195    DCF_F_STATOK    EQU   015h
+                     196    
+  0023               197    DCF_TFLAGS      EQU   023h         ; Bits 18-1f
+  0018               198    DCF_TF_NULL     EQU   018h
+  0019               199    DCF_TF_RES      EQU   019h
+  001A               200    DCF_TF_ADD      EQU   01Ah
+  001B               201    DCF_TF_CLRP     EQU   01Bh
+  001C               202    DCF_TF_CHKP     EQU   01Ch
+  001D               203    DCF_TF_SET      EQU   01Dh
+                     204    
+                     205    ;               *****************************************************************************
+                     206    ;               ***   Interrupt Vektor
+                     207    ;               *****************************************************************************
+                     208    
+0000                 209                    ORG   0000h                    ; Hauptprogramm
+0000 0134            210                    AJMP Main
+                     211    
+0003                 212                    ORG   0003h                    ; Externer Interrupt 0
+0003 3106            213                    ACALL E0IrqHandler
+0005 32              214                    RETI
+                     215    
+000B                 216                    ORG   000Bh                    ; Timer 0 Interrupt
+000B 11E7            217                    ACALL T0IrqHandler
+000D 32              218                    RETI
+                     219    
+0013                 220                    ORG   0013h                    ; Externer Interrupt 0
+0013 32              221                    RETI
+                     222    
+001B                 223                    ORG   001Bh                    ; Timer 1 Interrupt
+001B 32              224                    RETI
+                     225    
+0023                 226                    ORG   0023h                    ; Serieller Port Interrupt
+0023 32              227                    RETI
+                     228    
+0033                 229                    ORG   0033h                    ; Comparator Interrupt
+0033 32              230                    RETI
+                     231                    
+                     232    ;               *****************************************************************************
+                     233    ;               ***   Hauptprogramm
+                     234    ;               *****************************************************************************
+                     235    
+                     236    ;               -----------------------------------------------------------------------------
+                     237    ;               ---   Controler initialisieren
+                     238    ;               -----------------------------------------------------------------------------
+0034                 239    Main:
+0034 758148          240                    MOV   SP,#INIT_STACK           ; Stackpointer setzen
+0037 75D000          241                    MOV   PSW,#00000000b           ; Gegister-Bank 0
+                     242    ;               -----------------------------------------------------------------------------
+                     243    ;               ---   Port pin configuration like 8051 architecture                    ins LP
+                     244    ;               -----------------------------------------------------------------------------
+003A 75C100          245                    MOV   P1M0,#00h                ; set P1M0 for quasi bidirect. mode
+003D 75C200          246                    MOV   P1M1,#00h                ; set P1M1 for quasi bidirect. mode
+0040 75C600          247                    MOV   P3M0,#00h                ; set P3M0 for quasi bidirect. mode
+0043 75C700          248                    MOV   P3M1,#00h                ; set P3M1 for quasi bidirect. mode
+                     249    ;               -----------------------------------------------------------------------------
+0046 759080          250                    MOV   P1,#128                  ; DAC initialisieren
+0049 C2B5            251                    CLR   P3.5                     ; DAC A
+004B C2B4            252                    CLR   P3.4
+004D D2B4            253                    SETB  P3.4
+004F D2B5            254                    SETB  P3.5                     ; DAC B
+0051 C2B4            255                    CLR   P3.4
+0053 D2B4            256                    SETB  P3.4
+0055 90048C          257                    MOV   DPTR,#ScaleData          ; Zuerst Zifferblatt anzeigen
+0058 7830            258                    MOV   R0,#DISP_TAB             ; Display-Tabelle initialisieren
+005A 790B            259                    MOV   R1,#DISP_TAB_LEN
+005C                 260    Main_InitLoop1:
+005C A682            261                    MOV   @R0,DPL
+005E 08              262                    INC   R0
+005F A683            263                    MOV   @R0,DPH
+0061 08              264                    INC   R0
+0062 D9F8            265                    DJNZ  R1,Main_InitLoop1
+                     266    
+0064 752000          267                    MOV   DLINE_FLAGS,#0           ; Status initialisieren
+0067 7800            268                    MOV   R0,#0                    ; Zähler für Display-Tabelle initialisieren
+0069 7980            269                    MOV   R1,#128                  ; X1 initialisieren
+006B 7A80            270                    MOV   R2,#128                  ; Y1 initialisieren
+006D 7B80            271                    MOV   R3,#128                  ; X2 initialisieren
+006F 7C80            272                    MOV   R4,#128                  ; Y2 initialisieren
+                     273    
+0071 752100          274                    MOV   TIME_FLAGS,#0            ; Status initialisieren
+0074 750832          275                    MOV   TIME_R0,#TICKS_HZ        ; TICK-Zähler für Sekunden initialisieren
+0077 750900          276                    MOV   TIME_R1,#0               ; Sekunden initialisieren
+007A 750A00          277                    MOV   TIME_R2,#0               ; Minuten initialisieren
+007D 750B00          278                    MOV   TIME_R3,#0               ; Stunden initialisieren
+0080 750C00          279                    MOV   TIME_R4,#0               ; Tmp-Register initialisieren
+0083 750D01          280                    MOV   TIME_R5,#1               ; Tastenverzögerung initialisieren
+                     281    
+0086 752200          282                    MOV   DCF_FLAGS,#0             ; DCF-Flags initialisieren
+0089 752300          283                    MOV   DCF_TFLAGS,#0            ; DCF-Tabellen-Flags initialisieren
+008C 751000          284                    MOV   DCF_R0,#0                ; Reset Tabellenadresse
+008F 75113B          285                    MOV   DCF_R1,#59               ; Bitzähler initialisieren
+0092 751200          286                    MOV   DCF_R2,#0                ; Pulstimer initialisieren
+0095 75133C          287                    MOV   DCF_R3,#DCF_SYNCTIME     ; Zähler für Sync-Zeit initialisieren
+0098 751400          288                    MOV   DCF_R4,#0                ; DCF-Statusanzeige initialisieren
+                     289    
+009B 758901          290                    MOV   TMOD,#TMode1             ; Timer 0 Mode 1 (16 bit auto reload timer)
+009E D288            291                    SETB  IT0                      ; Falling edge/low level triggered ext. irq
+00A0 D2AF            292                    SETB  EA                       ; Enable global interrupt
+00A2 D2A9            293                    SETB  ET0                      ; Enable timer 0 interrupt
+00A4 D2A8            294                    SETB  EX0                      ; Enable external interrupt 0
+                     295    
+                     296    ;               -----------------------------------------------------------------------------
+                     297    ;               ---   Schleife für Bildschirmausgabe
+                     298    ;               -----------------------------------------------------------------------------
+                     299    ;               ---   Daten holen
+                     300    ;               -----------------------------------------------------------------------------
+00A6                 301    Main_Loop: 
+00A6 E4              302                    CLR   A                        ; nächstes X/Y-Paar holen
+00A7 93              303                    MOVC  A,@A+DPTR
+00A8 A3              304                    INC   DPTR
+00A9 6023            305                    JZ    Main_DImed               ; 000h = Immediate Jump
+00AB B4FF30          306                    CJNE  A,#0FFh,Main_DNorm       ; 0FFh = Tabellenende
+                     307    
+                     308    ;               -----------------------------------------------------------------------------
+                     309    ;               ---   Neue Displayadresse holen
+                     310    ;               -----------------------------------------------------------------------------
+00AE                 311    Main_NewAddr:   
+00AE 7430            312                    MOV   A,#DISP_TAB              ; Tabellenadresse berechnen
+00B0 28              313                    ADD   A,R0
+00B1 28              314                    ADD   A,R0
+00B2 F9              315                    MOV   R1,A
+00B3 C209            316                    CLR   TIME_F_ADCH              ; Prüfen, ob Tabelle während Lesens geändert
+00B5 E7              317                    MOV   A,@R1                    ; Daten aus Tabelle holen
+00B6 F582            318                    MOV   DPL,A
+00B8 09              319                    INC   R1
+00B9 E7              320                    MOV   A,@R1
+00BA F583            321                    MOV   DPH,A
+00BC 2009EF          322                    JB    TIME_F_ADCH,Main_NewAddr
+                     323    
+00BF 08              324                    INC   R0                       ; nächster Eintrag
+00C0 B80B0B          325                    CJNE  R0,#DISP_TAB_LEN,Main_DImed
+00C3 7800            326                    MOV   R0,#0
+00C5 D2B7            327                    SETB  P3.7                     ; Strahl aus
+00C7 C20B            328                    CLR   TIME_F_SYNC              ; Auf Sync warten
+00C9                 329    Main_Wait:      
+00C9 300BFD          330                    JNB   TIME_F_SYNC,Main_Wait
+00CC 01D4            331                    AJMP  Main_DImed_Get
+00CE                 332    Main_DImed:    
+00CE D2B7            333                    SETB  P3.7                     ; Strahl aus, dann delay
+00D0 7FC8            334                    MOV   R7,#BEAM_OFF_DLY_1       ; Verzögerung, um Schlieren zu bermeiden
+00D2                 335    Wait420:
+00D2 DFFE            336                    DJNZ  R7,Wait420               
+00D4                 337    Main_DImed_Get: 
+00D4 E4              338                    CLR   A                        ; erstes X/Y-Paar holen
+00D5 93              339                    MOVC  A,@A+DPTR
+00D6 A3              340                    INC   DPTR
+00D7 F9              341                    MOV   R1,A
+00D8 E4              342                    CLR   A
+00D9 93              343                    MOVC  A,@A+DPTR
+00DA A3              344                    INC   DPTR
+00DB FA              345                    MOV   R2,A
+00DC 01A6            346                    AJMP  Main_Loop
+00DE                 347    Main_DNorm:     
+00DE FB              348                    MOV   R3,A                     ; alles andere sind normale Daten
+00DF E4              349                    CLR   A
+00E0 93              350                    MOVC  A,@A+DPTR
+00E1 A3              351                    INC   DPTR
+00E2 FC              352                    MOV   R4,A
+                     353    ;               -----------------------------------------------------------------------------
+                     354    ;               ---   Linie Zeichnen
+                     355    ;               -----------------------------------------------------------------------------
+00E3 712C            356                    ACALL DrawLine
+00E5 01A6            357                    AJMP  Main_Loop
+                     358    
+                     359    ;               *****************************************************************************
+                     360    ;               ***   Handler für Interrupt T0                                         ins LP
+                     361    ;               *****************************************************************************
+                     362    ;               ***   Bei einer Taktfrequenz von 16MHz beträgt ein Taktzyklus 62.5nsec. Um
+                     363    ;               ***   eine Torzeit für den Netz-Irq von 5 msec zu erreichen, muß der Timer 0
+                     364    ;               ***   für 15 msec den Netz-Irq sperren. 15msec / 62.5nsec = 240000 Takte. Das
+                     365    ;               ***   sind hexadezimal 3A980H. Da der Timer aber nur bis FFFFH zählt, muß er
+                     366    ;               ***   drei volle Durchläufe + den Rest von A980H durchlaufen. (10000H - A980H
+                     367    ;               ***   = 5680H Zählervorbesetzung)
+                     368    ;               *****************************************************************************
+00E7                 369    T0IrqHandler:                                                                         ;chg LP
+00E7 C28C            370                    CLR   TCON.4                   ; Timer 0 stoppen
+00E9 C289            371                    CLR   TCON.1                   ; IE-Flag für Netz-IRQ löschen
+00EB D54615          372                    DJNZ  TimerDly,Irq1
+00EE 74FF            373                    MOV   A,#0FFh
+00F0 658C            374                    XRL   A,TH0
+00F2 700C            375                    JNZ   Irq2
+00F4 758C56          376                    MOV   TH0,#056h                ; Gate-Timer initialisieren
+00F7 758A80          377                    MOV   TL0,#080h                ; für die Restzeit
+00FA 754601          378                    MOV   TimerDly,#001h
+00FD D28C            379                    SETB  TCON.4                   ; Timer 0 starten, noch einmal
+00FF 22              380                    RET
+0100                 381    Irq2:
+0100 D2A8            382                    SETB  IE.0                     ; Netz-IRQ wieder zulassen
+0102 22              383                    RET
+0103                 384    Irq1:
+0103 D28C            385                    SETB  TCON.4                   ; und weier
+0105 22              386                    RET
+                     387    
+                     388    ;               *****************************************************************************
+                     389    ;               *** Handler für Interrupt E0 (50 Hz Netzfrequenz)
+                     390    ;               ***
+                     391    ;               *** Benutzte Register
+                     392    ;               ***   R0 - Tick-Counter für Sekunden
+                     393    ;               ***   R1 - Sekunden
+                     394    ;               ***   R2 - Minuten
+                     395    ;               ***   R3 - Stunden
+                     396    ;               ***   R4 - Tmp-Register
+                     397    ;               ***   R5 - Wiederholungszähler für Tasten
+                     398    ;               *****************************************************************************
+0106                 399    E0IrqHandler:  
+0106 C0D0            400                    PUSH  PSW
+0108 C0E0            401                    PUSH  ACC
+010A C0F0            402                    PUSH  B
+010C C082            403                    PUSH  DPL
+010E C083            404                    PUSH  DPH
+0110 75D008          405                    MOV   PSW,#00001000b           ; Register-Bank 1
+                     406    
+0113 C2A8            407                    CLR   IE.0                     ; Netz-IRQ sperren
+0115 758CFF          408                    MOV   TH0,#0FFh                ; Gate-Timer initialisieren             chg LP
+0118 758AFF          409                    MOV   TL0,#0FFh                ; für 15 ms                             chg LP
+                     410    ;               -----------------------------------------------------------------------------
+011B 754603          411                    MOV   TimerDly,#003h           ; 3 x 0FFH + 05680H                     ins LP
+                     412    ;               -----------------------------------------------------------------------------
+011E D28C            413                    SETB  TCON.4                   ; und starten
+                     414    
+0120 5112            415                    ACALL CheckKey                 ; Tasten abfragen
+                     416    
+0122 D81C            417                    DJNZ  R0,E0IrqH_DispAdr        ; Tick-Zähler aktualisieren
+0124 7832            418                    MOV   R0,#TICKS_HZ
+                     419    
+                     420    ;               -----------------------------------------------------------------------------
+                     421    ;               ---   Zeiten aktualisieren
+                     422    ;               -----------------------------------------------------------------------------
+0126 D208            423                    SETB  TIME_F_UPDD              ; Merker für Display-Update setzen
+0128 09              424                    INC   R1                       ; Sekunden aktualisieren
+0129 B93C14          425                    CJNE  R1,#60,E0IrqH_DispAdr
+012C 7900            426                    MOV   R1,#0
+                     427    
+012E 711A            428                    ACALL DCF77_UpdStat            ; Einmal pro Minute DCF-Status zurücksetzen
+0130 C215            429                    CLR   DCF_F_STATOK
+0132 C214            430                    CLR   DCF_F_STATDATA
+                     431    
+0134 0A              432                    INC   R2                       ; Minuten aktualisieren
+0135 BA3C08          433                    CJNE  R2,#60,E0IrqH_DispAdr
+0138 7A00            434                    MOV   R2,#0
+013A 0B              435                    INC   R3                       ; Stunden aktualisieren
+013B BB1802          436                    CJNE  R3,#24,E0IrqH_DispAdr
+013E 7B00            437                    MOV   R3,#0
+                     438    ;               -----------------------------------------------------------------------------
+                     439    ;               ---   Display-Adressen aktualisieren
+                     440    ;               -----------------------------------------------------------------------------
+0140                 441    E0IrqH_DispAdr: 
+0140 5146            442                    ACALL DCF77                    ; DCF77-Zeit auswerten
+0142 300808          443                    JNB   TIME_F_UPDD,E0IrqH_Out   ; Prüfen, ob Update erforderlich
+0145 315A            444                    ACALL DispAdrPtr
+0147 319F            445                    ACALL DispAdrNum
+0149 C208            446                    CLR   TIME_F_UPDD
+014B D209            447                    SETB  TIME_F_ADCH
+                     448    
+014D                 449    E0IrqH_Out:     
+014D D20B            450                    SETB  TIME_F_SYNC              ; Sync-Bit setzen
+014F D083            451                    POP   DPH
+0151 D082            452                    POP   DPL
+0153 D0F0            453                    POP   B
+0155 D0E0            454                    POP   ACC
+0157 D0D0            455                    POP   PSW
+0159 22              456                    RET
+                     457    
+                     458    ;               -----------------------------------------------------------------------------
+                     459    ;               ---   Display-Adressen für Zeiger aktualisieren
+                     460    ;               -----------------------------------------------------------------------------
+015A                 461    DispAdrPtr:     
+015A 900648          462                    MOV   DPTR,#SecPtrData         ; Daten für Sekundenzeiger
+015D E9              463                    MOV   A,R1                     ; Aktuellen Wert holen
+015E 75F005          464                    MOV   B,#5                     ; Sekundenzeiger sind 5 Byte lang
+0161 A4              465                    MUL   AB
+0162 2582            466                    ADD   A,DPL
+0164 F530            467                    MOV   DISP_TAB_SECPL,A
+0166 E5F0            468                    MOV   A,B
+0168 3583            469                    ADDC A,DPH
+016A F531            470                    MOV   DISP_TAB_SECPH,A
+                     471    
+016C 900774          472                    MOV   DPTR,#MinPtrData         ; Daten für Minutenzeiger
+016F EA              473                    MOV   A,R2                     ; Aktuellen Wert holen
+0170 75F009          474                    MOV   B,#9                     ; Minutenzeiger sind 9 Byte lang
+0173 A4              475                    MUL   AB
+0174 2582            476                    ADD   A,DPL
+0176 F532            477                    MOV   DISP_TAB_MINPL,A
+0178 E5F0            478                    MOV   A,B
+017A 3583            479                    ADDC A,DPH
+017C F533            480                    MOV   DISP_TAB_MINPH,A
+                     481    
+017E 900990          482                    MOV   DPTR,#HrPtrData          ; Daten für Stundenzeiger
+0181 EA              483                    MOV   A,R2                     ; Aktuellen Wert holen
+0182 75F00C          484                    MOV   B,#12                    ; Etwas aufwendiger, da Zwischenschritte
+0185 84              485                    DIV   AB                       ; erforderlich (5 Schritte pro Stunde)
+0186 FC              486                    MOV   R4,A                     ; dazu Minuten durch 12 Teilen um
+0187 EB              487                    MOV   A,R3                     ; auf die Zuwischenschritte zu kommen
+0188 75F00C          488                    MOV   B,#12                    ; und Stundenwert mit 5 multiplizieren
+018B 84              489                    DIV   AB
+018C 7405            490                    MOV   A,#5
+018E A4              491                    MUL   AB
+018F 2C              492                    ADD   A,R4
+0190 75F009          493                    MOV   B,#9                     ; Stundenzeiger sind 9 Byte lang
+0193 A4              494                    MUL   AB
+0194 2582            495                    ADD   A,DPL
+0196 F534            496                    MOV   DISP_TAB_HRPL,A
+0198 E5F0            497                    MOV   A,B
+019A 3583            498                    ADDC A,DPH
+019C F535            499                    MOV   DISP_TAB_HRPH,A
+                     500    
+019E 22              501                    RET
+                     502    
+                     503    ;               -----------------------------------------------------------------------------
+                     504    ;               *** Display-Adressen für Nummern aktualisieren
+                     505    ;               -----------------------------------------------------------------------------
+019F                 506    DispAdrNum:     
+019F E9              507                    MOV   A,R1                     ; Daten für Sekundenziffern
+01A0 75F00A          508                    MOV   B,#10
+01A3 84              509                    DIV   AB                       ; Zehner
+01A4 23              510                    RL    A
+01A5 FC              511                    MOV   R4,A
+01A6 900C81          512                    MOV   DPTR,#NumSecTens
+01A9 93              513                    MOVC  A,@A+DPTR
+01AA F539            514                    MOV   DISP_TAB_SECNTH,A
+01AC EC              515                    MOV   A,R4
+01AD 04              516                    INC   A
+01AE 93              517                    MOVC  A,@A+DPTR
+01AF F538            518                    MOV   DISP_TAB_SECNTL,A
+01B1 E5F0            519                    MOV   A,B                      ; Einer
+01B3 23              520                    RL    A
+01B4 FC              521                    MOV   R4,A
+01B5 900BAC          522                    MOV   DPTR,#NumSecOnes
+01B8 93              523                    MOVC   A,@A+DPTR
+01B9 F537            524                    MOV   DISP_TAB_SECNOH,A
+01BB EC              525                    MOV   A,R4
+01BC 04              526                    INC   A
+01BD 93              527                    MOVC  A,@A+DPTR
+01BE F536            528                    MOV   DISP_TAB_SECNOL,A
+                     529    
+01C0 EA              530                    MOV   A,R2                     ; Daten für Minutenziffern
+01C1 75F00A          531                    MOV   B,#10
+01C4 84              532                    DIV   AB                       ; Zehner
+01C5 23              533                    RL    A
+01C6 FC              534                    MOV   R4,A
+01C7 900DC5          535                    MOV   DPTR,#NumMinTens
+01CA 93              536                    MOVC  A,@A+DPTR
+01CB F53D            537                    MOV   DISP_TAB_MINNTH,A
+01CD EC              538                    MOV   A,R4
+01CE 04              539                    INC   A
+01CF 93              540                    MOVC  A,@A+DPTR
+01D0 F53C            541                    MOV   DISP_TAB_MINNTL,A
+01D2 E5F0            542                    MOV   A,B                      ; Einer
+01D4 23              543                    RL    A
+01D5 FC              544                    MOV   R4,A
+01D6 900CF0          545                    MOV   DPTR,#NumMinOnes
+01D9 93              546                    MOVC  A,@A+DPTR
+01DA F53B            547                    MOV   DISP_TAB_MINNOH,A
+01DC EC              548                    MOV   A,R4
+01DD 04              549                    INC   A
+01DE 93              550                    MOVC  A,@A+DPTR
+01DF F53A            551                    MOV   DISP_TAB_MINNOL,A
+                     552    
+01E1 EB              553                    MOV   A,R3                     ; Daten für Stundenziffern
+01E2 75F00A          554                    MOV   B,#10
+01E5 84              555                    DIV   AB                       ; Zehner
+01E6 23              556                    RL    A
+01E7 FC              557                    MOV   R4,A
+01E8 900F09          558                    MOV   DPTR,#NumHrTens
+01EB 93              559                    MOVC  A,@A+DPTR
+01EC F541            560                    MOV   DISP_TAB_HRNTH,A
+01EE EC              561                    MOV   A,R4
+01EF 04              562                    INC   A
+01F0 93              563                    MOVC  A,@A+DPTR
+01F1 F540            564                    MOV   DISP_TAB_HRNTL,A
+01F3 E5F0            565                    MOV   A,B                      ; Einer
+01F5 23              566                    RL    A
+01F6 FC              567                    MOV   R4,A
+01F7 900E34          568                    MOV   DPTR,#NumHrOnes
+01FA 93              569                    MOVC  A,@A+DPTR
+01FB F53F            570                    MOV   DISP_TAB_HRNOH,A
+01FD EC              571                    MOV   A,R4
+01FE 04              572                    INC   A
+01FF 93              573                    MOVC  A,@A+DPTR
+0200 F53E            574                    MOV   DISP_TAB_HRNOL,A
+                     575    
+0202 E514            576                    MOV   A,DCF_R4                 ; Daten für DCF-Status
+0204 23              577                    RL    A
+0205 FC              578                    MOV   R4,A
+0206 900F38          579                    MOV   DPTR,#DCFStats
+0209 93              580                    MOVC  A,@A+DPTR
+020A F543            581                    MOV   DISP_TAB_DCFSH,A
+020C EC              582                    MOV   A,R4
+020D 04              583                    INC   A
+020E 93              584                    MOVC  A,@A+DPTR
+020F F542            585                    MOV   DISP_TAB_DCFSL,A
+                     586    
+0211 22              587                    RET
+                     588    
+                     589    ;               -----------------------------------------------------------------------------
+                     590    ;               ---   Taster abfragen
+                     591    ;               -----------------------------------------------------------------------------
+0212                 592    CheckKey:       
+0212 A2B0            593                    MOV   C,P3.0                   ; Checken, ob Taste gedrückt
+0214 82B1            594                    ANL   C,P3.1
+0216 5006            595                    JNC   CheckKey_Down
+0218 7D01            596                    MOV   R5,#1                    ; Reset Wiederholungszähler, wenn keine Taste
+021A C20A            597                    CLR   TIME_F_KEYREP
+021C 4145            598                    AJMP  CheckKey_Out
+                     599    
+021E                 600    CheckKey_Down:  
+021E DD25            601                    DJNZ  R5,CheckKey_Out          ; Prüfen, ob Zeit abgelaufen
+0220 7D0C            602                    MOV   R5,#KEY_REPEAT           ; Default: Wiederholung
+0222 200A04          603                    JB    TIME_F_KEYREP,CheckKey_Proc
+0225 7D32            604                    MOV   R5,#KEY_DELAY            ; Erster Tastendruck
+0227 D20A            605                    SETB  TIME_F_KEYREP
+                     606    
+0229                 607    CheckKey_Proc:  
+0229 D208            608                    SETB  TIME_F_UPDD              ; Merker für Display-Update setzen
+022B C215            609                    CLR   DCF_F_STATOK             ; DCF-Status zurücksetzen
+022D 711A            610                    ACALL DCF77_UpdStat
+                     611    
+022F                 612    CheckKey_Proc0: 
+022F 20B00A          613                    JB    P3.0,CheckKey_Proc1
+0232 7832            614                    MOV   R0,#TICKS_HZ             ; reset Tick-Zähler
+0234 7900            615                    MOV   R1,#0                    ; Sekunden auf 0
+0236 0A              616                    INC   R2                       ; Minuten ändern
+0237 BA3C02          617                    CJNE  R2,#60,CheckKey_Proc1
+023A 7A00            618                    MOV   R2,#0
+                     619    
+023C                 620    CheckKey_Proc1:
+023C 20B106          621                    JB    P3.1,CheckKey_Out
+023F 0B              622                    INC   R3                       ; Stunden ändern
+0240 BB1802          623                    CJNE  R3,#24,CheckKey_Out
+0243 7B00            624                    MOV   R3,#0
+0245                 625    CheckKey_Out:   
+0245 22              626                    RET
+                     627    
+                     628    ;               *****************************************************************************
+                     629    ;               ***   DCF77-Zeit auswerten
+                     630    ;               ***
+                     631    ;               ***   Verwendete Register:
+                     632    ;               ***     R0   - Tepmorärer Zeiger
+                     633    ;               ***     R1   - Impulszähler (Sekunden)
+                     634    ;               ***     R2   - Zähler für Impulslänge
+                     635    ;               ***     R3   - Zähler für Sync-Pause
+                     636    ;               ***     R4   - Status für Anzeige
+                     637    ;               ***     R5   - Tepmoräres Register
+                     638    ;               ***     B    - Tepmoräres Register
+                     639    ;               ***     DPTR - Tepmorärer Zeiger
+                     640    ;               *****************************************************************************
+                     641    
+0246                 642    DCF77:         
+0246 C0D0            643                    PUSH  PSW
+0248 C0E0            644                    PUSH  ACC
+024A 75D010          645                    MOV   PSW,#00010000b           ; Register-Bank 2
+                     646    
+024D 20B327          647                    JB    P3.3,DCF77_Lo            ; Eingang auswerten
+                     648    
+                     649    ;               -----------------------------------------------------------------------------
+                     650    ;               ---   Hi-Zustand des Eingange behandeln
+                     651    ;               -----------------------------------------------------------------------------
+0250                 652    DCF77_Hi:       
+0250 301316          653                    JNB   DCF_F_TIMEOK,DCF77_HiC1  ; ggf. Zeit aktualisieren
+0253 C213            654                    CLR   DCF_F_TIMEOK
+0255 750832          655                    MOV   TIME_R0,#TICKS_HZ        ; reset Tick-Zähler
+0258 750900          656                    MOV   TIME_R1,#0               ; Sekunden auf 0
+025B E518            657                    MOV   A,DCF_MIN
+025D F50A            658                    MOV   TIME_R2,A
+025F E519            659                    MOV   A,DCF_HR
+0261 F50B            660                    MOV   TIME_R3,A
+0263 D208            661                    SETB  TIME_F_UPDD              ; Merker für Display-Update setzen
+0265 D215            662                    SETB  DCF_F_STATOK             ; Flag für Statusanzeige setzen
+0267 711A            663                    ACALL DCF77_UpdStat
+                     664    
+0269                 665    DCF77_HiC1:     
+0269 7B3C            666                    MOV   R3,#DCF_SYNCTIME         ; Zähler für Sync-Zeit zurücksetzen
+026B D210            667                    SETB  DCF_F_FE                 ; Flag für Flankenerkennung setzen
+                     668    
+026D BA0E04          669                    CJNE  R2,#DCF_MAXTIME,DCF77_HiC2
+0270 793B            670                    MOV   R1,#59                   ; Nichts weiter machen, wenn max. Pulslänge 
+0272 6115            671                    AJMP  DCF77_Out                ; erreicht
+0274                 672    DCF77_HiC2:     
+0274 0A              673                    INC   R2                       ; Zähler für Impulslänge aktualisieren
+0275 6115            674                    AJMP  DCF77_Out
+                     675    
+                     676    ;               -----------------------------------------------------------------------------
+                     677    ;               ---   Lo-Zustand des Eingange behandeln
+                     678    ;               -----------------------------------------------------------------------------
+0277                 679    DCF77_Lo:       
+0277 EB              680                    MOV   A,R3                     ; Sync-Timer prüfen
+0278 6006            681                    JZ    DCF77_LoFlag             ; Nix machen, wenn schon auf null
+027A 14              682                    DEC   A
+027B FB              683                    MOV   R3,A
+027C 7002            684                    JNZ   DCF77_LoFlag             ; Wenn auf null gewechselt:
+027E 7900            685                    MOV   R1,#0                    ; Bitzähler zurücksetzen
+                     686    
+                     687    ;               -----------------------------------------------------------------------------
+                     688    ;               ---   Fallende Flanke des Eingange behandeln
+                     689    ;               -----------------------------------------------------------------------------
+0280                 690    DCF77_LoFlag:   
+0280 30100C          691                    JNB   DCF_F_FE,DCF77_LoOut     ; Nur Flanken sind interessant
+0283 C210            692                    CLR   DCF_F_FE                 ; Flag für Flankenerkennung zurücksetzen
+                     693    
+0285 D214            694                    SETB  DCF_F_STATDATA           ; Flag für Datenempfang setzen
+0287 711A            695                    ACALL DCF77_UpdStat
+                     696    
+0289 EA              697                    MOV   A,R2                     ; Impulslänge merken
+028A 7A00            698                    MOV   R2,#0                    ; Zähler für Impulslänge zurücksetzen
+                     699    
+028C B93B02          700                    CJNE  R1,#59,DCF77_LoCkTime    ; maximal 58 Bits einlesen
+028F                 701    DCF77_LoOut:    
+028F 6115            702                    AJMP  DCF77_Out
+0291                 703    DCF77_LoCkTime: 
+0291 F5F0            704                    MOV   B,A                      ; Minimale Pulslänge prüfen
+0293 C3              705                    CLR   C
+0294 9403            706                    SUBB  A,#DCF_MINTIME
+0296 5004            707                    JNC   DCF77_LoBit
+0298 793B            708                    MOV   R1,#59                   ; Nichts weiter machen, wenn unter Minimum
+029A 6115            709                    AJMP  DCF77_Out
+                     710    
+029C                 711    DCF77_LoBit:    
+029C E5F0            712                    MOV   A,B
+029E C3              713                    CLR   C                        ; Bitstatus ermitteln
+029F 9408            714                    SUBB  A,#DCF_HITIME
+02A1 B3              715                    CPL   C
+02A2 9211            716                    MOV   DCF_F_BIT,C
+                     717    
+                     718    ;               -----------------------------------------------------------------------------
+                     719    ;               ---   Daten aus Decode-Tabelle holen
+                     720    ;               -----------------------------------------------------------------------------
+02A4 E9              721                    MOV   A,R1                     ; Adresse des Tabelleneintrags berechnen
+02A5 75F003          722                    MOV   B,#3                     ; ein Eintrag ist 3 Byte lang
+02A8 A4              723                    MUL   AB
+02A9 F5F0            724                    MOV   B,A
+02AB 9003C6          725                    MOV   DPTR,#DCF_Tab
+02AE 93              726                    MOVC  A,@A+DPTR                ; Flagmaske lesen
+02AF F523            727                    MOV   DCF_TFLAGS,A
+02B1 05F0            728                    INC   B
+02B3 E5F0            729                    MOV   A,B
+02B5 93              730                    MOVC  A,@A+DPTR                ; Wertadresse lesen
+02B6 F8              731                    MOV   R0,A
+02B7 05F0            732                    INC   B
+02B9 E5F0            733                    MOV   A,B
+02BB 93              734                    MOVC  A,@A+DPTR                ; Wert lesen
+02BC F5F0            735                    MOV   B,A
+                     736    
+                     737    ;               -----------------------------------------------------------------------------
+                     738    ;               ---   Einzelne Aktionen ausführen
+                     739    ;               -----------------------------------------------------------------------------
+                     740    ;               ---   Check ob gelesenes Bit 0 ist
+                     741    ;               -----------------------------------------------------------------------------
+02BE                 742    DCF77_TabNULL:  
+02BE 301803          743                    JNB   DCF_TF_NULL,DCF77_TabSET
+02C1 201111          744                    JB    DCF_F_BIT,DCF77_TabCHKPE
+                     745    
+                     746    ;               -----------------------------------------------------------------------------
+                     747    ;               ---   Check ob gelesenes Bit 1 ist
+                     748    ;               -----------------------------------------------------------------------------
+02C4                 749    DCF77_TabSET:   
+02C4 301D03          750                    JNB   DCF_TF_SET,DCF77_TabCHKP
+02C7 30110B          751                    JNB   DCF_F_BIT,DCF77_TabCHKPE
+                     752    
+                     753    ;               -----------------------------------------------------------------------------
+                     754    ;               ---   Parity-Bit prüfen
+                     755    ;               -----------------------------------------------------------------------------
+02CA                 756    DCF77_TabCHKP:  
+02CA 301C0C          757                    JNB   DCF_TF_CHKP,DCF77_TabCLRP
+02CD A212            758                    MOV   C,DCF_F_PARITY
+02CF 301101          759                    JNB   DCF_F_BIT,DCF77_TabCHKPC
+02D2 B3              760                    CPL   C
+02D3                 761    DCF77_TabCHKPC: 
+02D3 5004            762                    JNC   DCF77_TabCLRP
+02D5                 763    DCF77_TabCHKPE: 
+02D5 793B            764                    MOV   R1,#59                   ; Nichts weiter machen
+02D7 6115            765                    AJMP  DCF77_Out
+                     766    
+                     767    ;               -----------------------------------------------------------------------------
+                     768    ;               ---   Parity-Bit zurücksetzen
+                     769    ;               -----------------------------------------------------------------------------
+02D9                 770    DCF77_TabCLRP:  
+02D9 301B02          771                    JNB   DCF_TF_CLRP,DCF77_TabRES
+02DC C212            772                    CLR   DCF_F_PARITY
+                     773    
+                     774    ;               -----------------------------------------------------------------------------
+                     775    ;               ---   Aktuellen Wert zurücksetzen
+                     776    ;               -----------------------------------------------------------------------------
+02DE                 777    DCF77_TabRES:   
+02DE 301902          778                    JNB   DCF_TF_RES,DCF77_TabADD
+02E1 E4              779                    CLR   A
+02E2 F6              780                    MOV   @R0,A
+                     781    
+                     782    ;               -----------------------------------------------------------------------------
+                     783    ;               ---   Aktuellen Wert addieren
+                     784    ;               -----------------------------------------------------------------------------
+02E3                 785    DCF77_TabADD:   
+02E3 301A07          786                    JNB   DCF_TF_ADD,DCF77_TabNone
+02E6 301104          787                    JNB   DCF_F_BIT,DCF77_TabNone
+02E9 E6              788                    MOV   A,@R0
+02EA 25F0            789                    ADD   A,B
+02EC F6              790                    MOV   @R0,A
+                     791    
+02ED                 792    DCF77_TabNone:  
+02ED B93A1F          793                    CJNE  R1,#58,DCF77_TabOut      ; Flag für korrekte Zeit setzen, wenn alles 
+                     794                                                   ; empfangen
+02F0 90047A          795                    MOV   DPTR,#DCF_ValCheck       ; Wertbereiche prüfen
+02F3 7D06            796                    MOV   R5,#6
+02F5                 797    DCF77_ValCkeck: 
+02F5 E4              798                    CLR   A                        ; Wertadresse holen
+02F6 93              799                    MOVC  A,@A+DPTR
+02F7 A3              800                    INC   DPTR
+02F8 F8              801                    MOV   R0,A
+02F9 E4              802                    CLR   A                        ; Mindestwert prüfen
+02FA 93              803                    MOVC  A,@A+DPTR
+02FB A3              804                    INC   DPTR
+02FC F5F0            805                    MOV   B,A
+02FE E6              806                    MOV   A,@R0
+02FF C3              807                    CLR   C
+0300 95F0            808                    SUBB  A,B
+0302 400B            809                    JC    DCF77_TabOut
+0304 E4              810                    CLR   A                        ; Maximalwert prüfen
+0305 93              811                    MOVC  A,@A+DPTR
+0306 A3              812                    INC   DPTR
+0307 C3              813                    CLR   C
+0308 96              814                    SUBB  A,@R0
+0309 4004            815                    JC    DCF77_TabOut
+030B DDE8            816                    DJNZ  R5,DCF77_ValCkeck
+030D D213            817                    SETB  DCF_F_TIMEOK             ; Flag für Korrekte Zeit setzen
+                     818    
+030F                 819    DCF77_TabOut:
+030F 09              820                    INC   R1                       ; Bitzähler aktualisieren
+0310 301102          821                    JNB   DCF_F_BIT,DCF77_Out      ; Parity aktualisieren
+0313 B212            822                    CPL   DCF_F_PARITY
+                     823    
+0315                 824    DCF77_Out:     
+0315 D0E0            825                    POP   ACC
+0317 D0D0            826                    POP   PSW
+0319 22              827                    RET
+                     828    
+031A                 829    DCF77_UpdStat:  
+031A 301504          830                    JNB   DCF_F_STATOK,DCF77_UpSt1
+031D 751402          831                    MOV   DCF_R4,#2
+0320 22              832                    RET
+0321                 833    DCF77_UpSt1:    
+0321 301404          834                    JNB   DCF_F_STATDATA,DCF77_UpSt0
+0324 751401          835                    MOV   DCF_R4,#1
+0327 22              836                    RET
+0328                 837    DCF77_UpSt0:   
+0328 751400          838                    MOV   DCF_R4,#0
+032B 22              839                    RET
+                     840    
+                     841    ;               *****************************************************************************
+                     842    ;               ***   Linien-Routine
+                     843    ;               ***
+                     844    ;               ***   Parameter:
+                     845    ;               ***     R1 - X-Start
+                     846    ;               ***     R2 - Y-Start
+                     847    ;               ***     R3 - X-Ziel
+                     848    ;               ***     R4 - Y-Ziel
+                     849    ;               ***
+                     850    ;               ***   Rückgabe:
+                     851    ;               ***     DLINE_FLAGS - Status-Register
+                     852    ;               ***     R5          - DeltaX
+                     853    ;               ***     R6          - DeltaY
+                     854    ;               ***     R7          - Fehler-Register
+                     855    ;               ***
+                     856    ;               ***   Bugs:
+                     857    ;               ***     Fehlerregister hat ein Bit zu wenig, um
+                     858    ;               ***     DeltaY-Werte > 127 zu verarbeiten
+                     859    ;               ***     Reicht aber für unsere Zwecke
+                     860    ;               *****************************************************************************
+                     861    
+032C                 862    DrawLine:       
+032C 752000          863                    MOV   DLINE_FLAGS,#0           ; Status initialisieren
+                     864    ;               -----------------------------------------------------------------------------
+                     865    ;               ---   DAC initialisieren, wenn Strahl aus ist
+                     866    ;               -----------------------------------------------------------------------------
+032F 30B714          867                    JNB   P3.7,DrawLine_DLT
+0332 8990            868                    MOV   P1,R1                    ; DAC 1 aktualisieren
+0334 C2B5            869                    CLR   P3.5
+0336 C2B4            870                    CLR   P3.4
+0338 D2B4            871                    SETB  P3.4
+033A 8A90            872                    MOV   P1,R2                    ; DAC 2 aktualisiseren
+033C D2B5            873                    SETB  P3.5
+033E C2B4            874                    CLR   P3.4
+0340 D2B4            875                    SETB  P3.4
+0342 7FC8            876                    MOV   R7,#BEAM_ON_DLY_1        ; Verzögerung, um Schlieren zu
+0344                 877    DrawLine_IDL:   
+0344 DFFE            878                    DJNZ  R7,DrawLine_IDL          ; vermeiden
+                     879    ;               -----------------------------------------------------------------------------
+                     880    ;               ---   Deltas berechnen
+                     881    ;               -----------------------------------------------------------------------------
+0346                 882    DrawLine_DLT:   
+0346 C3              883                    CLR   C                        ; deltaX berechnen
+0347 E9              884                    MOV   A,R1
+0348 9B              885                    SUBB  A,R3
+0349 5003            886                    JNC   DrawLine_DXC
+034B 14              887                    DEC   A
+034C 64FF            888                    XRL   A,#0FFh
+034E                 889    DrawLine_DXC:   
+034E FD              890                    MOV   R5,A
+034F C3              891                    CLR   C                        ; deltaY berechnen
+0350 EA              892                    MOV   A,R2
+0351 9C              893                    SUBB  A,R4
+0352 5003            894                    JNC   DrawLine_DYC
+0354 14              895                    DEC   A
+0355 64FF            896                    XRL   A,#0FFh
+0357                 897    DrawLine_DYC:   
+0357 FE              898                    MOV   R6,A
+                     899    ;               -----------------------------------------------------------------------------
+                     900    ;               ---   X- und Y-Werte tauschen, wenn erforderlich
+                     901    ;               -----------------------------------------------------------------------------
+0358 C3              902                    CLR   C                        ; deltaX muß > deltaY sein
+0359 ED              903                    MOV   A,R5                     ; wenn doch, X- und Y-Werte tauschen
+035A 9E              904                    SUBB  A,R6
+035B 500B            905                    JNC   DrawLine_DIR
+035D D202            906                    SETB  DLINE_F_SWXY
+035F E9              907                    MOV   A,R1
+0360 CA              908                    XCH   A,R2
+0361 F9              909                    MOV   R1,A
+0362 EB              910                    MOV   A,R3
+0363 CC              911                    XCH   A,R4
+0364 FB              912                    MOV   R3,A
+0365 ED              913                    MOV   A,R5
+0366 CE              914                    XCH   A,R6
+0367 FD              915                    MOV   R5,A
+                     916    ;               -----------------------------------------------------------------------------
+                     917    ;               ---   Richtungen ermitteln
+                     918    ;               -----------------------------------------------------------------------------
+0368                 919    DrawLine_DIR:   
+0368 C3              920                    CLR   C                        ; X-Richtung ermitteln
+0369 EB              921                    MOV   A,R3
+036A 99              922                    SUBB  A,R1
+036B 9200            923                    MOV   DLINE_F_XDIR,C
+036D C3              924                    CLR   C                        ; Y-Richtung ermitteln
+036E EC              925                    MOV   A,R4
+036F 9A              926                    SUBB  A,R2
+0370 9201            927                    MOV   DLINE_F_YDIR,C
+                     928    ;               -----------------------------------------------------------------------------
+                     929    ;               ---   Flags setzen
+                     930    ;               -----------------------------------------------------------------------------
+0372 7F00            931                    MOV   R7,#0                    ; Fehler-Register initialisieren
+0374 C2B7            932                    CLR   P3.7                     ; Strahl an, wenn aus war
+                     933    ;               -----------------------------------------------------------------------------
+                     934    ;               ---   DAC aktualisieren
+                     935    ;               -----------------------------------------------------------------------------
+0376                 936    DrawLineLoop:   
+0376 A202            937                    MOV   C,DLINE_F_SWXY           ; Swaping von X/Y berücksichtigen
+0378 8990            938                    MOV   P1,R1                    ; DAC 1 aktualisieren
+037A 92B5            939                    MOV   P3.5,C
+037C C2B4            940                    CLR   P3.4
+037E D2B4            941                    SETB   P3.4
+0380 B3              942                    CPL   C                        ; anderen DAC wählen
+0381 8A90            943                    MOV   P1,R2                    ; DAC 2 aktualisiseren
+0383 92B5            944                    MOV   P3.5,C
+0385 C2B4            945                    CLR   P3.4
+0387 D2B4            946                    SETB  P3.4
+                     947    ;               -----------------------------------------------------------------------------
+0389 75F012          948                    MOV   B,#DRAW_DLY              ; ins Draw delay
+038C                 949    DrawLine_IDL2:  
+038C D5F0FD          950                    DJNZ  B,DrawLine_IDL2         
+                     951    ;               -----------------------------------------------------------------------------
+                     952    ;               ---   prüfen, ob Ziel erreicht
+                     953    ;               -----------------------------------------------------------------------------
+038F E9              954                    MOV   A,R1
+0390 B50308          955                    CJNE  A,DLINE_R3,DrawLine_Err
+0393 30022F          956                    JNB   DLINE_F_SWXY,DrawLine_Out
+0396 E9              957                    MOV   A,R1                     ;ggf. X- und Y-Wert zurücktauschen
+0397 CA              958                    XCH   A,R2
+0398 F9              959                    MOV   R1,A
+0399 61C5            960                    AJMP  DrawLine_Out
+                     961    ;               -----------------------------------------------------------------------------
+                     962    ;               ---   Fehler aktualisieren
+                     963    ;               -----------------------------------------------------------------------------
+039B                 964    DrawLine_Err:   
+039B EF              965                    MOV   A,R7
+039C 2E              966                    ADD   A,R6
+039D FF              967                    MOV   R7,A
+039E 5002            968                    JNC   DrawLine_ChkY
+03A0 C203            969                    CLR   DLINE_F_ENEG
+                     970    ;               -----------------------------------------------------------------------------
+                     971    ;               ---   Wenn Fehler zu groß, einen Schritt in Y-Richtung
+                     972    ;               -----------------------------------------------------------------------------
+03A2                 973    DrawLine_ChkY:  
+03A2 200317          974                    JB    DLINE_F_ENEG,DrawLine_IncX
+03A5 ED              975                    MOV   A,R5
+03A6 D3              976                    SETB  C
+03A7 9F              977                    SUBB  A,R7
+03A8 4005            978                    JC    DrawLine_IncY
+03AA 9F              979                    SUBB  A,R7
+03AB 4002            980                    JC    DrawLine_IncY
+03AD 61BC            981                    AJMP  DrawLine_IncX
+03AF                 982    DrawLine_IncY:  
+03AF EF              983                    MOV   A,R7                     ; Fehler und Y-Wert aktualisieren
+03B0 C3              984                    CLR   C
+03B1 9D              985                    SUBB  A,R5
+03B2 FF              986                    MOV   R7,A
+03B3 9203            987                    MOV   DLINE_F_ENEG,C
+03B5 200103          988                    JB    DLINE_F_YDIR,DrawLine_IncYN
+03B8 0A              989                    INC   R2
+03B9 61BC            990                    AJMP  DrawLine_IncX
+03BB                 991    DrawLine_IncYN: 
+03BB 1A              992                    DEC   R2
+                     993    ;               -----------------------------------------------------------------------------
+                     994    ;               ---   X-Wert aktualisieren
+                     995    ;               -----------------------------------------------------------------------------
+03BC                 996    DrawLine_IncX:  
+03BC 200003          997                    JB    DLINE_F_XDIR,DrawLine_IncXN
+03BF 09              998                    INC   R1
+03C0 6176            999                    AJMP  DrawLineLoop
+03C2                1000    DrawLine_IncXN:
+03C2 19             1001                    DEC   R1
+03C3 6176           1002                    AJMP  DrawLineLoop
+03C5                1003    DrawLine_Out:  
+03C5 22             1004                    RET
+                    1005    
+                    1006    ;               *****************************************************************************
+                    1007    ;               ***   Tabelle für DCF77-Decodierer
+                    1008    ;               ***
+                    1009    ;               ***   Satzaufbau:
+                    1010    ;               ***    1. Bitmaske für Flags
+                    1011    ;               ***    2. Adresse für Wertmerker
+                    1012    ;               ***    3. Wert bei gesetztem Bit
+                    1013    ;               ***
+                    1014    ;               ***   Flag-Bits:
+                    1015    ;               ***    0 - Empfangendes Bit muß 0 sein
+                    1016    ;               ***    1 - Wertmerker vor Addition zurücksetzen
+                    1017    ;               ***    2 - Aktuellen Wert auf Wertmerker addieren
+                    1018    ;               ***    3 - Paritybit zurücksetzen
+                    1019    ;               ***    4 - Paritybit mit empfangenen Bit vergleichen
+                    1020    ;               ***    5 - Empfangendes Bit muß 1 sein
+                    1021    ;               *****************************************************************************
+                    1022    
+03C6                1023    DCF_Tab:        
+03C6 010000         1024                    DB 00000001b,0,0               ; DCF-Sekunde 0  (Start, Immer 0)
+03C9 000000         1025                    DB 00000000b,0,0               ; DCF-Sekunde 1
+03CC 000000         1026                    DB 00000000b,0,0               ; DCF-Sekunde 2
+03CF 000000         1027                    DB 00000000b,0,0               ; DCF-Sekunde 3
+03D2 000000         1028                    DB 00000000b,0,0               ; DCF-Sekunde 4
+03D5 000000         1029                    DB 00000000b,0,0               ; DCF-Sekunde 5
+03D8 000000         1030                    DB 00000000b,0,0               ; DCF-Sekunde 6
+03DB 000000         1031                    DB 00000000b,0,0               ; DCF-Sekunde 7
+03DE 000000         1032                    DB 00000000b,0,0               ; DCF-Sekunde 8
+03E1 000000         1033                    DB 00000000b,0,0               ; DCF-Sekunde 9
+03E4 000000         1034                    DB 00000000b,0,0               ; DCF-Sekunde 10
+03E7 000000         1035                    DB 00000000b,0,0               ; DCF-Sekunde 11
+03EA 000000         1036                    DB 00000000b,0,0               ; DCF-Sekunde 12
+03ED 000000         1037                    DB 00000000b,0,0               ; DCF-Sekunde 13
+03F0 000000         1038                    DB 00000000b,0,0               ; DCF-Sekunde 14
+03F3 000000         1039                    DB 00000000b,0,0               ; DCF-Sekunde 15 (Reserveantenne aktiv)
+03F6 000000         1040                    DB 00000000b,0,0               ; DCF-Sekunde 16 (Umstellung SZ/WZ)
+03F9 000000         1041                    DB 00000000b,0,0               ; DCF-Sekunde 17 (Sommerzeit aktiv)
+03FC 000000         1042                    DB 00000000b,0,0               ; DCF-Sekunde 18 (Winterzeit aktiv)
+03FF 000000         1043                    DB 00000000b,0,0               ; DCF-Sekunde 19 (Ankündigung Schaltsekunde)
+0402 200000         1044                    DB 00100000b,0,0               ; DCF-Sekunde 20 (Zeitbeginn, immer 1)
+                    1045    
+0405 0E1801         1046                    DB 00001110b,DCF_MIN,1         ; DCF-Sekunde 21 (Start Minuten)
+0408 041802         1047                    DB 00000100b,DCF_MIN,2         ; DCF-Sekunde 22
+040B 041804         1048                    DB 00000100b,DCF_MIN,4         ; DCF-Sekunde 23
+040E 041808         1049                    DB 00000100b,DCF_MIN,8         ; DCF-Sekunde 24
+0411 04180A         1050                    DB 00000100b,DCF_MIN,10        ; DCF-Sekunde 25
+0414 041814         1051                    DB 00000100b,DCF_MIN,20        ; DCF-Sekunde 26
+0417 041828         1052                    DB 00000100b,DCF_MIN,40        ; DCF-Sekunde 27
+041A 100000         1053                    DB 00010000b,0,0               ; DCF-Sekunde 28 (Parity Minuten)
+                    1054    
+041D 0E1901         1055                    DB 00001110b,DCF_HR,1          ; DCF-Sekunde 29 (Start Stunden)
+0420 041902         1056                    DB 00000100b,DCF_HR,2          ; DCF-Sekunde 30
+0423 041904         1057                    DB 00000100b,DCF_HR,4          ; DCF-Sekunde 31
+0426 041908         1058                    DB 00000100b,DCF_HR,8          ; DCF-Sekunde 32
+0429 04190A         1059                    DB 00000100b,DCF_HR,10         ; DCF-Sekunde 33
+042C 041914         1060                    DB 00000100b,DCF_HR,20         ; DCF-Sekunde 34
+042F 100000         1061                    DB 00010000b,0,0               ; DCF-Sekunde 35 (Parity Stunden)
+                    1062    
+0432 0E1A01         1063                    DB 00001110b,DCF_DAY,1         ; DCF-Sekunde 36 (Start Tag)
+0435 041A02         1064                    DB 00000100b,DCF_DAY,2         ; DCF-Sekunde 37
+0438 041A04         1065                    DB 00000100b,DCF_DAY,4         ; DCF-Sekunde 38
+043B 041A08         1066                    DB 00000100b,DCF_DAY,8         ; DCF-Sekunde 39
+043E 041A0A         1067                    DB 00000100b,DCF_DAY,10        ; DCF-Sekunde 40
+0441 041A14         1068                    DB 00000100b,DCF_DAY,20        ; DCF-Sekunde 41
+0444 061B01         1069                    DB 00000110b,DCF_DOW,1         ; DCF-Sekunde 42 (Start Wochentag)
+0447 041B02         1070                    DB 00000100b,DCF_DOW,2         ; DCF-Sekunde 43
+044A 041B04         1071                    DB 00000100b,DCF_DOW,4         ; DCF-Sekunde 44
+044D 061C01         1072                    DB 00000110b,DCF_MON,1         ; DCF-Sekunde 45 (Start Monat)
+0450 041C02         1073                    DB 00000100b,DCF_MON,2         ; DCF-Sekunde 46
+0453 041C04         1074                    DB 00000100b,DCF_MON,4         ; DCF-Sekunde 47
+0456 041C08         1075                    DB 00000100b,DCF_MON,8         ; DCF-Sekunde 48
+0459 041C0A         1076                    DB 00000100b,DCF_MON,10        ; DCF-Sekunde 49
+045C 061D01         1077                    DB 00000110b,DCF_YR,1          ; DCF-Sekunde 50 (Start Jahr)
+045F 041D02         1078                    DB 00000100b,DCF_YR,2          ; DCF-Sekunde 51
+0462 041D04         1079                    DB 00000100b,DCF_YR,4          ; DCF-Sekunde 52
+0465 041D08         1080                    DB 00000100b,DCF_YR,8          ; DCF-Sekunde 53
+0468 041D0A         1081                    DB 00000100b,DCF_YR,10         ; DCF-Sekunde 54
+046B 041D14         1082                    DB 00000100b,DCF_YR,20         ; DCF-Sekunde 55
+046E 041D28         1083                    DB 00000100b,DCF_YR,40         ; DCF-Sekunde 56
+0471 041D50         1084                    DB 00000100b,DCF_YR,80         ; DCF-Sekunde 57
+0474 100000         1085                    DB 00010000b,0,0               ; DCF-Sekunde 58 (Parity Datum)
+0477 000000         1086                    DB 00000000b,0,0               ; DCF-Sekunde 59 (Sync-Pause)
+                    1087    
+                    1088    ;               *****************************************************************************
+                    1089    ;               ***   Tabelle für DCF77-Bereichsprüfung
+                    1090    ;               ***
+                    1091    ;               ***   Satzaufbau:
+                    1092    ;               ***     1. Adresse für Wertmerker
+                    1093    ;               ***     2. Minimalwert
+                    1094    ;               ***     3. Maximalwert
+                    1095    ;               *****************************************************************************
+                    1096    
+047A                1097    DCF_ValCheck:   
+047A 18003B         1098                    DB DCF_MIN,0,59
+047D 190017         1099                    DB DCF_HR,0,23
+0480 1A011F         1100                    DB DCF_DAY,1,31
+0483 1B0107         1101                    DB DCF_DOW,1,7
+0486 1C010C         1102                    DB DCF_MON,1,12
+0489 1D0063         1103                    DB DCF_YR,0,99
+                    1104    
+                =1  1105    $Include(DisplDat.INC)
+                =1  1106    ;               **********************************************************************************
+                =1  1107    ;               *** Daten für Anzeige
+                =1  1108    ;               **********************************************************************************
+                =1  1109    
+048C 74207A1A   =1  1110    ScaleData:      DB 116,032,122,026,122,044,000
+0490 7A2C00     
+0493 831D861A   =1  1111                    DB 131,029,134,026,140,026,143,029,143,032,131,044,143,044,000
+0497 8C1A8F1D   
+049B 8F20832C   
+049F 8F2C00     
+04A2 86D783D4   =1  1112                    DB 134,215,131,212,125,212,122,215,122,227,125,230,131,230,134,227,134,224
+04A6 7DD47AD7   
+04AA 7AE37DE6   
+04AE 83E686E3   
+04B2 86E0       
+04B4 83DD7DDD   =1  1113                    DB 131,221,125,221,122,224,000
+04B8 7AE000     
+04BB D67AD977   =1  1114                    DB 214,122,217,119,223,119,226,122,226,125,223,128,226,131,226,134,223,137
+04BF DF77E27A   
+04C3 E27DDF80   
+04C7 E283E286   
+04CB DF89       
+04CD D989D686   =1  1115                    DB 217,137,214,134,000,217,128,223,128,000
+04D1 00D980DF   
+04D5 8000       
+04D7 1D862089   =1  1116                    DB 029,134,032,137,038,137,041,134,041,122,038,119,032,119,029,122,029,125
+04DB 26892986   
+04DF 297A2677   
+04E3 20771D7A   
+04E7 1D7D       
+04E9 20802680   =1  1117                    DB 032,128,038,128,041,125,000
+04ED 297D00     
+                =1  1118    
+04F0 6CB26CB0   =1  1119                    DB 108,178,108,176,112,176,112,178,108,178,000,108,182,108,184,112,184,112,182
+04F4 70B070B2   
+04F8 6CB2006C   
+04FC B66CB870   
+0500 B870B6     
+0503 6CB600     =1  1120                    DB 108,182,000
+0506 90B290B0   =1  1121                    DB 144,178,144,176,148,176,148,178,144,178,000,144,182,144,184,148,184,148,182
+050A 94B094B2   
+050E 90B20090   
+0512 B690B894   
+0516 B894B6     
+0519 90B600     =1  1122                    DB 144,182,000
+                =1  1123    
+051C 80028016   =1  1124                    DB 128,002,128,022,000,141,002,140,007,000,154,004,153,009,000,166,008,165,012,000
+0520 008D028C   
+0524 07009A04   
+0528 990900A6   
+052C 08A50C00   
+0530 B30CB111   =1  1125                    DB 179,012,177,017,000,191,018,186,027,000,202,026,199,030,000,212,034,208,038,000
+0534 00BF12BA   
+0538 1B00CA1A   
+053C C71E00D4   
+0540 22D02600   
+0544 DD2BD92F   =1  1126                    DB 221,043,217,047,000,229,053,225,056,000,237,065,228,070,000,243,076,238,078,000
+0548 00E535E1   
+054C 3800ED41   
+0550 E44600F3   
+0554 4CEE4E00   
+0558 F759F35A   =1  1127                    DB 247,089,243,090,000,251,101,246,102,000,253,114,248,115,000,253,128,233,128,000
+055C 00FB65F6   
+0560 6600FD72   
+0564 F87300FD   
+0568 80E98000   
+056C FD8DF88C   =1  1128                    DB 253,141,248,140,000,251,154,246,153,000,247,166,243,165,000,243,179,238,177,000
+0570 00FB9AF6   
+0574 9900F7A6   
+0578 F3A500F3   
+057C B3EEB100   
+0580 EDBFE4BA   =1  1129                    DB 237,191,228,186,000,229,202,225,199,000,221,212,217,208,000,212,221,208,217,000
+0584 00E5CAE1   
+0588 C700DDD4   
+058C D9D000D4   
+0590 DDD0D900   
+0594 CAE5C7E1   =1  1130                    DB 202,229,199,225,000,191,237,186,228,000,179,243,177,238,000,166,247,165,243,000
+0598 00BFEDBA   
+059C E400B3F3   
+05A0 B1EE00A6   
+05A4 F7A5F300   
+05A8 9AFB99F6   =1  1131                    DB 154,251,153,246,000,141,253,140,248,000,127,253,127,233,000,114,253,115,248,000
+05AC 008DFD8C   
+05B0 F8007FFD   
+05B4 7FE90072   
+05B8 FD73F800   
+05BC 65FB66F6   =1  1132                    DB 101,251,102,246,000,089,247,090,243,000,076,243,078,238,000,065,237,070,228,000
+05C0 0059F75A   
+05C4 F3004CF3   
+05C8 4EEE0041   
+05CC ED46E400   
+05D0 35E538E1   =1  1133                    DB 053,229,056,225,000,043,221,047,217,000,034,212,038,208,000,026,202,030,199,000
+05D4 002BDD2F   
+05D8 D90022D4   
+05DC 26D0001A   
+05E0 CA1EC700   
+05E4 12BE1BB9   =1  1134                    DB 018,190,027,185,000,012,179,017,177,000,008,166,012,165,000,004,154,009,153,000
+05E8 000CB311   
+05EC B10008A6   
+05F0 0CA50004   
+05F4 9A099900   
+05F8 028D078C   =1  1135                    DB 002,141,007,140,000,002,127,022,127,000,002,114,007,115,000,004,101,009,102,000
+05FC 00027F16   
+0600 7F000272   
+0604 07730004   
+0608 65096600   
+060C 08590C5A   =1  1136                    DB 008,089,012,090,000,012,076,017,078,000,018,065,027,070,000,026,053,030,056,000
+0610 000C4C11   
+0614 4E001241   
+0618 1B46001A   
+061C 351E3800   
+0620 222B262F   =1  1137                    DB 034,043,038,047,000,043,034,047,038,000,053,026,056,030,000,064,018,069,027,000
+0624 002B222F   
+0628 2600351A   
+062C 381E0040   
+0630 12451B00   
+0634 4C0C4E11   =1  1138                    DB 076,012,078,017,000,089,008,090,012,000,101,004,102,009,000,114,002,115,007,255
+0638 0059085A   
+063C 0C006504   
+0640 66090072   
+0644 027307FF   
+                =1  1139    
+0648 801A8080   =1  1140    SecPtrData:     DB 128,026,128,128,255,138,026,128,128,255,149,028,128,128,255,159,030,128,128,255
+064C FF8A1A80   
+0650 80FF951C   
+0654 8080FF9F   
+0658 1E8080FF   
+065C A9228080   =1  1141                    DB 169,034,128,128,255,178,039,128,128,255,187,045,128,128,255,196,052,128,128,255
+0660 FFB22780   
+0664 80FFBB2D   
+0668 8080FFC4   
+066C 348080FF   
+0670 CB3B8080   =1  1142                    DB 203,059,128,128,255,210,068,128,128,255,216,077,128,128,255,221,086,128,128,255
+0674 FFD24480   
+0678 80FFD84D   
+067C 8080FFDD   
+0680 568080FF   
+0684 E1608080   =1  1143                    DB 225,096,128,128,255,227,106,128,128,255,229,117,128,128,255,230,128,128,128,255
+0688 FFE36A80   
+068C 80FFE575   
+0690 8080FFE6   
+0694 808080FF   
+0698 E58A8080   =1  1144                    DB 229,138,128,128,255,227,149,128,128,255,225,159,128,128,255,221,169,128,128,255
+069C FFE39580   
+06A0 80FFE19F   
+06A4 8080FFDD   
+06A8 A98080FF   
+06AC D8B38080   =1  1145                    DB 216,179,128,128,255,210,187,128,128,255,203,196,128,128,255,196,203,128,128,255
+06B0 FFD2BB80   
+06B4 80FFCBC4   
+06B8 8080FFC4   
+06BC CB8080FF   
+06C0 BBD28080   =1  1146                    DB 187,210,128,128,255,179,216,128,128,255,169,221,128,128,255,159,225,128,128,255
+06C4 FFB3D880   
+06C8 80FFA9DD   
+06CC 8080FF9F   
+06D0 E18080FF   
+06D4 95E38080   =1  1147                    DB 149,227,128,128,255,138,229,128,128,255,128,229,128,128,255,117,229,128,128,255
+06D8 FF8AE580   
+06DC 80FF80E5   
+06E0 8080FF75   
+06E4 E58080FF   
+06E8 6AE38080   =1  1148                    DB 106,227,128,128,255,096,225,128,128,255,086,221,128,128,255,077,216,128,128,255
+06EC FF60E180   
+06F0 80FF56DD   
+06F4 8080FF4D   
+06F8 D88080FF   
+06FC 44D28080   =1  1149                    DB 068,210,128,128,255,059,203,128,128,255,052,196,128,128,255,045,187,128,128,255
+0700 FF3BCB80   
+0704 80FF34C4   
+0708 8080FF2D   
+070C BB8080FF   
+0710 27B28080   =1  1150                    DB 039,178,128,128,255,034,169,128,128,255,030,159,128,128,255,028,149,128,128,255
+0714 FF22A980   
+0718 80FF1E9F   
+071C 8080FF1C   
+0720 958080FF   
+0724 1A8A8080   =1  1151                    DB 026,138,128,128,255,026,127,128,128,255,026,117,128,128,255,028,106,128,128,255
+0728 FF1A7F80   
+072C 80FF1A75   
+0730 8080FF1C   
+0734 6A8080FF   
+0738 1E608080   =1  1152                    DB 030,096,128,128,255,034,086,128,128,255,039,077,128,128,255,045,068,128,128,255
+073C FF225680   
+0740 80FF274D   
+0744 8080FF2D   
+0748 448080FF   
+074C 343B8080   =1  1153                    DB 052,059,128,128,255,059,052,128,128,255,068,045,128,128,255,076,039,128,128,255
+0750 FF3B3480   
+0754 80FF442D   
+0758 8080FF4C   
+075C 278080FF   
+0760 56228080   =1  1154                    DB 086,034,128,128,255,096,030,128,128,255,106,028,128,128,255,117,026,128,128,255
+0764 FF601E80   
+0768 80FF6A1C   
+076C 8080FF75   
+0770 1A8080FF   
+                =1  1155    
+0774 8A7F801A   =1  1156    MinPtrData:     DB 138,127,128,026,118,127,138,127,255,137,129,138,026,118,126,137,129,255
+0778 767F8A7F   
+077C FF89818A   
+0780 1A767E89   
+0784 81FF       
+0786 8982951C   =1  1157                    DB 137,130,149,028,118,125,137,130,255,137,131,159,030,118,124,137,131,255
+078A 767D8982   
+078E FF89839F   
+0792 1E767C89   
+0796 83FF       
+0798 8984A922   =1  1158                    DB 137,132,169,034,118,123,137,132,255,136,133,179,039,119,122,136,133,255
+079C 767B8984   
+07A0 FF8885B3   
+07A4 27777A88   
+07A8 85FF       
+07AA 8885BB2D   =1  1159                    DB 136,133,187,045,119,122,136,133,255,135,134,196,052,120,121,135,134,255
+07AE 777A8885   
+07B2 FF8786C4   
+07B6 34787987   
+07BA 86FF       
+07BC 8687CB3B   =1  1160                    DB 134,135,203,059,121,120,134,135,255,133,136,210,068,122,119,133,136,255
+07C0 79788687   
+07C4 FF8588D2   
+07C8 447A7785   
+07CC 88FF       
+07CE 8588D84D   =1  1161                    DB 133,136,216,077,123,119,133,136,255,132,137,221,086,123,118,132,137,255
+07D2 7B778588   
+07D6 FF8489DD   
+07DA 567B7684   
+07DE 89FF       
+07E0 8389E160   =1  1162                    DB 131,137,225,096,124,118,131,137,255,130,137,227,106,125,118,130,137,255
+07E4 7C768389   
+07E8 FF8289E3   
+07EC 6A7D7682   
+07F0 89FF       
+07F2 8189E575   =1  1163                    DB 129,137,229,117,126,118,129,137,255,128,138,229,128,128,118,128,138,255
+07F6 7E768189   
+07FA FF808AE5   
+07FE 80807680   
+0802 8AFF       
+0804 7E89E58A   =1  1164                    DB 126,137,229,138,129,118,126,137,255,125,137,227,149,130,118,125,137,255
+0808 81767E89   
+080C FF7D89E3   
+0810 9582767D   
+0814 89FF       
+0816 7C89E19F   =1  1165                    DB 124,137,225,159,131,118,124,137,255,123,137,221,169,132,118,123,137,255
+081A 83767C89   
+081E FF7B89DD   
+0822 A984767B   
+0826 89FF       
+0828 7B88D8B3   =1  1166                    DB 123,136,216,179,133,119,123,136,255,122,136,210,187,133,119,122,136,255
+082C 85777B88   
+0830 FF7A88D2   
+0834 BB85777A   
+0838 88FF       
+083A 7987CBC4   =1  1167                    DB 121,135,203,196,134,120,121,135,255,120,134,196,203,135,121,120,134,255
+083E 86787987   
+0842 FF7886C4   
+0846 CB877978   
+084A 86FF       
+084C 7785BBD2   =1  1168                    DB 119,133,187,210,136,122,119,133,255,119,133,179,216,136,122,119,133,255
+0850 887A7785   
+0854 FF7785B3   
+0858 D8887A77   
+085C 85FF       
+085E 7684A9DD   =1  1169                    DB 118,132,169,221,137,123,118,132,255,118,131,159,225,137,124,118,131,255
+0862 897B7684   
+0866 FF76839F   
+086A E1897C76   
+086E 83FF       
+0870 768295E3   =1  1170                    DB 118,130,149,227,137,125,118,130,255,118,129,138,229,137,126,118,129,255
+0874 897D7682   
+0878 FF76818A   
+087C E5897E76   
+0880 81FF       
+0882 767F7FE5   =1  1171                    DB 118,127,127,229,137,128,118,127,255,118,126,117,229,137,129,118,126,255
+0886 8980767F   
+088A FF767E75   
+088E E5898176   
+0892 7EFF       
+0894 767D6AE3   =1  1172                    DB 118,125,106,227,137,130,118,125,255,118,124,096,225,137,131,118,124,255
+0898 8982767D   
+089C FF767C60   
+08A0 E1898376   
+08A4 7CFF       
+08A6 767B56DD   =1  1173                    DB 118,123,086,221,137,132,118,123,255,119,123,077,216,136,132,119,123,255
+08AA 8984767B   
+08AE FF777B4D   
+08B2 D8888477   
+08B6 7BFF       
+08B8 777A44D2   =1  1174                    DB 119,122,068,210,136,133,119,122,255,120,121,059,203,135,134,120,121,255
+08BC 8885777A   
+08C0 FF78793B   
+08C4 CB878678   
+08C8 79FF       
+08CA 797834C4   =1  1175                    DB 121,120,052,196,134,135,121,120,255,122,119,045,187,133,136,122,119,255
+08CE 86877978   
+08D2 FF7A772D   
+08D6 BB85887A   
+08DA 77FF       
+08DC 7A7727B2   =1  1176                    DB 122,119,039,178,132,136,122,119,255,123,118,034,169,132,137,123,118,255
+08E0 84887A77   
+08E4 FF7B7622   
+08E8 A984897B   
+08EC 76FF       
+08EE 7C761E9F   =1  1177                    DB 124,118,030,159,131,137,124,118,255,125,118,028,149,130,137,125,118,255
+08F2 83897C76   
+08F6 FF7D761C   
+08FA 9582897D   
+08FE 76FF       
+0900 7E761A8A   =1  1178                    DB 126,118,026,138,129,137,126,118,255,127,118,026,127,127,138,127,118,255
+0904 81897E76   
+0908 FF7F761A   
+090C 7F7F8A7F   
+0910 76FF       
+0912 81761A75   =1  1179                    DB 129,118,026,117,126,137,129,118,255,130,118,028,106,125,137,130,118,255
+0916 7E898176   
+091A FF82761C   
+091E 6A7D8982   
+0922 76FF       
+0924 83761E60   =1  1180                    DB 131,118,030,096,124,137,131,118,255,132,118,034,086,123,137,132,118,255
+0928 7C898376   
+092C FF847622   
+0930 567B8984   
+0934 76FF       
+0936 8477274D   =1  1181                    DB 132,119,039,077,123,136,132,119,255,133,119,045,068,122,136,133,119,255
+093A 7B888477   
+093E FF85772D   
+0942 447A8885   
+0946 77FF       
+0948 8678343B   =1  1182                    DB 134,120,052,059,121,135,134,120,255,135,121,059,052,120,134,135,121,255
+094C 79878678   
+0950 FF87793B   
+0954 34788687   
+0958 79FF       
+095A 887A442D   =1  1183                    DB 136,122,068,045,119,133,136,122,255,136,122,076,039,119,133,136,122,255
+095E 7785887A   
+0962 FF887A4C   
+0966 27778588   
+096A 7AFF       
+096C 897B5622   =1  1184                    DB 137,123,086,034,118,132,137,123,255,137,124,096,030,118,131,137,124,255
+0970 7684897B   
+0974 FF897C60   
+0978 1E768389   
+097C 7CFF       
+097E 897D6A1C   =1  1185                    DB 137,125,106,028,118,130,137,125,255,137,126,117,026,118,129,137,126,255
+0982 7682897D   
+0986 FF897E75   
+098A 1A768189   
+098E 7EFF       
+                =1  1186    
+0990 8A7F8044   =1  1187    HrPtrData:      DB 138,127,128,068,118,127,138,127,255,137,129,134,068,118,126,137,129,255
+0994 767F8A7F   
+0998 FF898186   
+099C 44767E89   
+09A0 81FF       
+09A2 89828C45   =1  1188                    DB 137,130,140,069,118,125,137,130,255,137,131,146,070,118,124,137,131,255
+09A6 767D8982   
+09AA FF898392   
+09AE 46767C89   
+09B2 83FF       
+09B4 89849849   =1  1189                    DB 137,132,152,073,118,123,137,132,255,136,133,158,076,119,122,136,133,255
+09B8 767B8984   
+09BC FF88859E   
+09C0 4C777A88   
+09C4 85FF       
+09C6 8885A34F   =1  1190                    DB 136,133,163,079,119,122,136,133,255,135,134,168,083,120,121,135,134,255
+09CA 777A8885   
+09CE FF8786A8   
+09D2 53787987   
+09D6 86FF       
+09D8 8687AC57   =1  1191                    DB 134,135,172,087,121,120,134,135,255,133,136,176,092,122,119,133,136,255
+09DC 79788687   
+09E0 FF8588B0   
+09E4 5C7A7785   
+09E8 88FF       
+09EA 8588B362   =1  1192                    DB 133,136,179,098,123,119,133,136,255,132,137,182,103,123,118,132,137,255
+09EE 7B778588   
+09F2 FF8489B6   
+09F6 677B7684   
+09FA 89FF       
+09FC 8389B96D   =1  1193                    DB 131,137,185,109,124,118,131,137,255,130,137,186,115,125,118,130,137,255
+0A00 7C768389   
+0A04 FF8289BA   
+0A08 737D7682   
+0A0C 89FF       
+0A0E 8189BB79   =1  1194                    DB 129,137,187,121,126,118,129,137,255,128,138,187,128,128,118,128,138,255
+0A12 7E768189   
+0A16 FF808ABB   
+0A1A 80807680   
+0A1E 8AFF       
+0A20 7E89BB86   =1  1195                    DB 126,137,187,134,129,118,126,137,255,125,137,186,140,130,118,125,137,255
+0A24 81767E89   
+0A28 FF7D89BA   
+0A2C 8C82767D   
+0A30 89FF       
+0A32 7C89B992   =1  1196                    DB 124,137,185,146,131,118,124,137,255,123,137,182,152,132,118,123,137,255
+0A36 83767C89   
+0A3A FF7B89B6   
+0A3E 9884767B   
+0A42 89FF       
+0A44 7B88B39E   =1  1197                    DB 123,136,179,158,133,119,123,136,255,122,136,176,163,133,119,122,136,255
+0A48 85777B88   
+0A4C FF7A88B0   
+0A50 A385777A   
+0A54 88FF       
+0A56 7987ACA8   =1  1198                    DB 121,135,172,168,134,120,121,135,255,120,134,168,172,135,121,120,134,255
+0A5A 86787987   
+0A5E FF7886A8   
+0A62 AC877978   
+0A66 86FF       
+0A68 7785A3B0   =1  1199                    DB 119,133,163,176,136,122,119,133,255,119,133,158,179,136,122,119,133,255
+0A6C 887A7785   
+0A70 FF77859E   
+0A74 B3887A77   
+0A78 85FF       
+0A7A 768498B6   =1  1200                    DB 118,132,152,182,137,123,118,132,255,118,131,146,185,137,124,118,131,255
+0A7E 897B7684   
+0A82 FF768392   
+0A86 B9897C76   
+0A8A 83FF       
+0A8C 76828CBA   =1  1201                    DB 118,130,140,186,137,125,118,130,255,118,129,134,187,137,126,118,129,255
+0A90 897D7682   
+0A94 FF768186   
+0A98 BB897E76   
+0A9C 81FF       
+0A9E 767F7FBB   =1  1202                    DB 118,127,127,187,137,128,118,127,255,118,126,121,187,137,129,118,126,255
+0AA2 8980767F   
+0AA6 FF767E79   
+0AAA BB898176   
+0AAE 7EFF       
+0AB0 767D73BA   =1  1203                    DB 118,125,115,186,137,130,118,125,255,118,124,109,185,137,131,118,124,255
+0AB4 8982767D   
+0AB8 FF767C6D   
+0ABC B9898376   
+0AC0 7CFF       
+0AC2 767B67B6   =1  1204                    DB 118,123,103,182,137,132,118,123,255,119,123,098,179,136,132,119,123,255
+0AC6 8984767B   
+0ACA FF777B62   
+0ACE B3888477   
+0AD2 7BFF       
+0AD4 777A5CB0   =1  1205                    DB 119,122,092,176,136,133,119,122,255,120,121,087,172,135,134,120,121,255
+0AD8 8885777A   
+0ADC FF787957   
+0AE0 AC878678   
+0AE4 79FF       
+0AE6 797853A8   =1  1206                    DB 121,120,083,168,134,135,121,120,255,122,119,079,163,133,136,122,119,255
+0AEA 86877978   
+0AEE FF7A774F   
+0AF2 A385887A   
+0AF6 77FF       
+0AF8 7A774C9D   =1  1207                    DB 122,119,076,157,132,136,122,119,255,123,118,073,152,132,137,123,118,255
+0AFC 84887A77   
+0B00 FF7B7649   
+0B04 9884897B   
+0B08 76FF       
+0B0A 7C764692   =1  1208                    DB 124,118,070,146,131,137,124,118,255,125,118,069,140,130,137,125,118,255
+0B0E 83897C76   
+0B12 FF7D7645   
+0B16 8C82897D   
+0B1A 76FF       
+0B1C 7E764486   =1  1209                    DB 126,118,068,134,129,137,126,118,255,127,118,068,127,127,138,127,118,255
+0B20 81897E76   
+0B24 FF7F7644   
+0B28 7F7F8A7F   
+0B2C 76FF       
+0B2E 81764479   =1  1210                    DB 129,118,068,121,126,137,129,118,255,130,118,069,115,125,137,130,118,255
+0B32 7E898176   
+0B36 FF827645   
+0B3A 737D8982   
+0B3E 76FF       
+0B40 8376466D   =1  1211                    DB 131,118,070,109,124,137,131,118,255,132,118,073,103,123,137,132,118,255
+0B44 7C898376   
+0B48 FF847649   
+0B4C 677B8984   
+0B50 76FF       
+0B52 84774C62   =1  1212                    DB 132,119,076,098,123,136,132,119,255,133,119,079,092,122,136,133,119,255
+0B56 7B888477   
+0B5A FF85774F   
+0B5E 5C7A8885   
+0B62 77FF       
+0B64 86785357   =1  1213                    DB 134,120,083,087,121,135,134,120,255,135,121,087,083,120,134,135,121,255
+0B68 79878678   
+0B6C FF877957   
+0B70 53788687   
+0B74 79FF       
+0B76 887A5C4F   =1  1214                    DB 136,122,092,079,119,133,136,122,255,136,122,097,076,119,133,136,122,255
+0B7A 7785887A   
+0B7E FF887A61   
+0B82 4C778588   
+0B86 7AFF       
+0B88 897B6749   =1  1215                    DB 137,123,103,073,118,132,137,123,255,137,124,109,070,118,131,137,124,255
+0B8C 7684897B   
+0B90 FF897C6D   
+0B94 46768389   
+0B98 7CFF       
+0B9A 897D7345   =1  1216                    DB 137,125,115,069,118,130,137,125,255,137,126,121,068,118,129,137,126,255
+0B9E 7682897D   
+0BA2 FF897E79   
+0BA6 44768189   
+0BAA 7EFF       
+                =1  1217    
+0BAC 0BC00BD3   =1  1218    NumSecOnes:     DW NumSecOnes0,NumSecOnes1,NumSecOnes2,NumSecOnes3,NumSecOnes4
+0BB0 0BDA0BE9   
+0BB4 0C05       
+0BB6 0C0E0C23   =1  1219                    DW NumSecOnes5,NumSecOnes6,NumSecOnes7,NumSecOnes8,NumSecOnes9
+0BBA 0C3C0C47   
+0BBE 0C68       
+0BC0 A6B0A8AE   =1  1220    NumSecOnes0:    DB 166,176,168,174,172,174,174,176,174,184,172,186,168,186,166,184,166,176
+0BC4 ACAEAEB0   
+0BC8 AEB8ACBA   
+0BCC A8BAA6B8   
+0BD0 A6B0       
+0BD2 FF         =1  1221                    DB 255
+0BD3 A8B2ACAE   =1  1222    NumSecOnes1:    DB 168,178,172,174,172,186,255
+0BD7 ACBAFF     
+0BDA A6B0A8AE   =1  1223    NumSecOnes2:    DB 166,176,168,174,172,174,174,176,174,178,166,186,174,186,255
+0BDE ACAEAEB0   
+0BE2 AEB2A6BA   
+0BE6 AEBAFF     
+0BE9 A6B0A8AE   =1  1224    NumSecOnes3:    DB 166,176,168,174,172,174,174,176,174,178,172,180,174,182,174,184,172,186
+0BED ACAEAEB0   
+0BF1 AEB2ACB4   
+0BF5 AEB6AEB8   
+0BF9 ACBA       
+0BFB A8BAA6B8   =1  1225                    DB 168,186,166,184,000,168,180,172,180,255
+0BFF 00A8B4AC   
+0C03 B4FF       
+0C05 AEB4A6B4   =1  1226    NumSecOnes4:    DB 174,180,166,180,172,174,172,186,255
+0C09 ACAEACBA   
+0C0D FF         
+0C0E AEAEA6AE   =1  1227    NumSecOnes5:    DB 174,174,166,174,166,182,168,180,172,180,174,182,174,184,172,186,168,186
+0C12 A6B6A8B4   
+0C16 ACB4AEB6   
+0C1A AEB8ACBA   
+0C1E A8BA       
+0C20 A6B8FF     =1  1228                    DB 166,184,255
+0C23 AEB0ACAE   =1  1229    NumSecOnes6:    DB 174,176,172,174,168,174,166,176,166,184,168,186,172,186,174,184,174,182
+0C27 A8AEA6B0   
+0C2B A6B8A8BA   
+0C2F ACBAAEB8   
+0C33 AEB6       
+0C35 ACB4A8B4   =1  1230                    DB 172,180,168,180,166,182,255
+0C39 A6B6FF     
+0C3C A6AEAEAE   =1  1231    NumSecOnes7:    DB 166,174,174,174,174,176,170,180,170,186,255
+0C40 AEB0AAB4   
+0C44 AABAFF     
+0C47 A8B4A6B2   =1  1232    NumSecOnes8:    DB 168,180,166,178,166,176,168,174,172,174,174,176,174,178,172,180,168,180
+0C4B A6B0A8AE   
+0C4F ACAEAEB0   
+0C53 AEB2ACB4   
+0C57 A8B4       
+0C59 A6B6A6B8   =1  1233                    DB 166,182,166,184,168,186,172,186,174,184,174,182,172,180,255
+0C5D A8BAACBA   
+0C61 AEB8AEB6   
+0C65 ACB4FF     
+0C68 A6B8A8BA   =1  1234    NumSecOnes9:    DB 166,184,168,186,172,186,174,184,174,176,172,174,168,174,166,176,166,178
+0C6C ACBAAEB8   
+0C70 AEB0ACAE   
+0C74 A8AEA6B0   
+0C78 A6B2       
+0C7A A8B4ACB4   =1  1235                    DB 168,180,172,180,174,178,255
+0C7E AEB2FF     
+                =1  1236    
+0C81 0C8D0CA0   =1  1237    NumSecTens:     DW NumSecTens0,NumSecTens1,NumSecTens2,NumSecTens3,NumSecTens4,NumSecTens5
+0C85 0CA70CB6   
+0C89 0CD20CDB   
+0C8D 9AB09CAE   =1  1238    NumSecTens0:    DB 154,176,156,174,160,174,162,176,162,184,160,186,156,186,154,184,154,176
+0C91 A0AEA2B0   
+0C95 A2B8A0BA   
+0C99 9CBA9AB8   
+0C9D 9AB0       
+0C9F FF         =1  1239                    DB 255
+0CA0 9CB2A0AE   =1  1240    NumSecTens1:    DB 156,178,160,174,160,186,255
+0CA4 A0BAFF     
+0CA7 9AB09CAE   =1  1241    NumSecTens2:    DB 154,176,156,174,160,174,162,176,162,178,154,186,162,186,255
+0CAB A0AEA2B0   
+0CAF A2B29ABA   
+0CB3 A2BAFF     
+0CB6 9AB09CAE   =1  1242    NumSecTens3:    DB 154,176,156,174,160,174,162,176,162,178,160,180,162,182,162,184,160,186
+0CBA A0AEA2B0   
+0CBE A2B2A0B4   
+0CC2 A2B6A2B8   
+0CC6 A0BA       
+0CC8 9CBA9AB8   =1  1243                    DB 156,186,154,184,000,156,180,160,180,255
+0CCC 009CB4A0   
+0CD0 B4FF       
+0CD2 A2B49AB4   =1  1244    NumSecTens4:    DB 162,180,154,180,160,174,160,186,255
+0CD6 A0AEA0BA   
+0CDA FF         
+0CDB A2AE9AAE   =1  1245    NumSecTens5:    DB 162,174,154,174,154,182,156,180,160,180,162,182,162,184,160,186,156,186
+0CDF 9AB69CB4   
+0CE3 A0B4A2B6   
+0CE7 A2B8A0BA   
+0CEB 9CBA       
+0CED 9AB8FF     =1  1246                    DB 154,184,255
+                =1  1247    
+0CF0 0D040D17   =1  1248    NumMinOnes:     DW NumMinOnes0,NumMinOnes1,NumMinOnes2,NumMinOnes3,NumMinOnes4
+0CF4 0D1E0D2D   
+0CF8 0D49       
+0CFA 0D520D67   =1  1249                    DW NumMinOnes5,NumMinOnes6,NumMinOnes7,NumMinOnes8,NumMinOnes9
+0CFE 0D800D8B   
+0D02 0DAC       
+0D04 82B084AE   =1  1250    NumMinOnes0:    DB 130,176,132,174,136,174,138,176,138,184,136,186,132,186,130,184,130,176
+0D08 88AE8AB0   
+0D0C 8AB888BA   
+0D10 84BA82B8   
+0D14 82B0       
+0D16 FF         =1  1251                    DB 255
+0D17 84B288AE   =1  1252    NumMinOnes1:    DB 132,178,136,174,136,186,255
+0D1B 88BAFF     
+0D1E 82B084AE   =1  1253    NumMinOnes2:    DB 130,176,132,174,136,174,138,176,138,178,130,186,138,186,255
+0D22 88AE8AB0   
+0D26 8AB282BA   
+0D2A 8ABAFF     
+0D2D 82B084AE   =1  1254    NumMinOnes3:    DB 130,176,132,174,136,174,138,176,138,178,136,180,138,182,138,184,136,186
+0D31 88AE8AB0   
+0D35 8AB288B4   
+0D39 8AB68AB8   
+0D3D 88BA       
+0D3F 84BA82B8   =1  1255                    DB 132,186,130,184,000,132,180,136,180,255
+0D43 0084B488   
+0D47 B4FF       
+0D49 8AB482B4   =1  1256    NumMinOnes4:    DB 138,180,130,180,136,174,136,186,255
+0D4D 88AE88BA   
+0D51 FF         
+0D52 8AAE82AE   =1  1257    NumMinOnes5:    DB 138,174,130,174,130,182,132,180,136,180,138,182,138,184,136,186,132,186
+0D56 82B684B4   
+0D5A 88B48AB6   
+0D5E 8AB888BA   
+0D62 84BA       
+0D64 82B8FF     =1  1258                    DB 130,184,255
+0D67 8AB088AE   =1  1259    NumMinOnes6:    DB 138,176,136,174,132,174,130,176,130,184,132,186,136,186,138,184,138,182
+0D6B 84AE82B0   
+0D6F 82B884BA   
+0D73 88BA8AB8   
+0D77 8AB6       
+0D79 88B484B4   =1  1260                    DB 136,180,132,180,130,182,255
+0D7D 82B6FF     
+0D80 82AE8AAE   =1  1261    NumMinOnes7:    DB 130,174,138,174,138,176,134,180,134,186,255
+0D84 8AB086B4   
+0D88 86BAFF     
+0D8B 84B482B2   =1  1262    NumMinOnes8:    DB 132,180,130,178,130,176,132,174,136,174,138,176,138,178,136,180,132,180
+0D8F 82B084AE   
+0D93 88AE8AB0   
+0D97 8AB288B4   
+0D9B 84B4       
+0D9D 82B682B8   =1  1263                    DB 130,182,130,184,132,186,136,186,138,184,138,182,136,180,255
+0DA1 84BA88BA   
+0DA5 8AB88AB6   
+0DA9 88B4FF     
+0DAC 82B884BA   =1  1264    NumMinOnes9:    DB 130,184,132,186,136,186,138,184,138,176,136,174,132,174,130,176,130,178
+0DB0 88BA8AB8   
+0DB4 8AB088AE   
+0DB8 84AE82B0   
+0DBC 82B2       
+0DBE 84B488B4   =1  1265                    DB 132,180,136,180,138,178,255
+0DC2 8AB2FF     
+                =1  1266    
+0DC5 0DD10DE4   =1  1267    NumMinTens:     DW NumMinTens0,NumMinTens1,NumMinTens2,NumMinTens3,NumMinTens4,NumMinTens5
+0DC9 0DEB0DFA   
+0DCD 0E160E1F   
+0DD1 76B078AE   =1  1268    NumMinTens0:    DB 118,176,120,174,124,174,126,176,126,184,124,186,120,186,118,184,118,176
+0DD5 7CAE7EB0   
+0DD9 7EB87CBA   
+0DDD 78BA76B8   
+0DE1 76B0       
+0DE3 FF         =1  1269                    DB 255
+0DE4 78B27CAE   =1  1270    NumMinTens1:    DB 120,178,124,174,124,186,255
+0DE8 7CBAFF     
+0DEB 76B078AE   =1  1271    NumMinTens2:    DB 118,176,120,174,124,174,126,176,126,178,118,186,126,186,255
+0DEF 7CAE7EB0   
+0DF3 7EB276BA   
+0DF7 7EBAFF     
+0DFA 76B078AE   =1  1272    NumMinTens3:    DB 118,176,120,174,124,174,126,176,126,178,124,180,126,182,126,184,124,186
+0DFE 7CAE7EB0   
+0E02 7EB27CB4   
+0E06 7EB67EB8   
+0E0A 7CBA       
+0E0C 78BA76B8   =1  1273                    DB 120,186,118,184,000,120,180,124,180,255
+0E10 0078B47C   
+0E14 B4FF       
+0E16 7EB476B4   =1  1274    NumMinTens4:    DB 126,180,118,180,124,174,124,186,255
+0E1A 7CAE7CBA   
+0E1E FF         
+0E1F 7EAE76AE   =1  1275    NumMinTens5:    DB 126,174,118,174,118,182,120,180,124,180,126,182,126,184,124,186,120,186
+0E23 76B678B4   
+0E27 7CB47EB6   
+0E2B 7EB87CBA   
+0E2F 78BA       
+0E31 76B8FF     =1  1276                    DB 118,184,255
+                =1  1277    
+0E34 0E480E5B   =1  1278    NumHrOnes:      DW NumHrOnes0,NumHrOnes1,NumHrOnes2,NumHrOnes3,NumHrOnes4
+0E38 0E620E71   
+0E3C 0E8D       
+0E3E 0E960EAB   =1  1279                    DW NumHrOnes5,NumHrOnes6,NumHrOnes7,NumHrOnes8,NumHrOnes9
+0E42 0EC40ECF   
+0E46 0EF0       
+0E48 5EB060AE   =1  1280    NumHrOnes0:     DB 094,176,096,174,100,174,102,176,102,184,100,186,096,186,094,184,094,176
+0E4C 64AE66B0   
+0E50 66B864BA   
+0E54 60BA5EB8   
+0E58 5EB0       
+0E5A FF         =1  1281                    DB 255
+0E5B 60B264AE   =1  1282    NumHrOnes1:     DB 096,178,100,174,100,186,255
+0E5F 64BAFF     
+0E62 5EB060AE   =1  1283    NumHrOnes2:     DB 094,176,096,174,100,174,102,176,102,178,094,186,102,186,255
+0E66 64AE66B0   
+0E6A 66B25EBA   
+0E6E 66BAFF     
+0E71 5EB060AE   =1  1284    NumHrOnes3:     DB 094,176,096,174,100,174,102,176,102,178,100,180,102,182,102,184,100,186
+0E75 64AE66B0   
+0E79 66B264B4   
+0E7D 66B666B8   
+0E81 64BA       
+0E83 60BA5EB8   =1  1285                    DB 096,186,094,184,000,096,180,100,180,255
+0E87 0060B464   
+0E8B B4FF       
+0E8D 66B45EB4   =1  1286    NumHrOnes4:     DB 102,180,094,180,100,174,100,186,255
+0E91 64AE64BA   
+0E95 FF         
+0E96 66AE5EAE   =1  1287    NumHrOnes5:     DB 102,174,094,174,094,182,096,180,100,180,102,182,102,184,100,186,096,186
+0E9A 5EB660B4   
+0E9E 64B466B6   
+0EA2 66B864BA   
+0EA6 60BA       
+0EA8 5EB8FF     =1  1288                    DB 094,184,255
+0EAB 66B064AE   =1  1289    NumHrOnes6:     DB 102,176,100,174,096,174,094,176,094,184,096,186,100,186,102,184,102,182
+0EAF 60AE5EB0   
+0EB3 5EB860BA   
+0EB7 64BA66B8   
+0EBB 66B6       
+0EBD 64B460B4   =1  1290                    DB 100,180,096,180,094,182,255
+0EC1 5EB6FF     
+0EC4 5EAE66AE   =1  1291    NumHrOnes7:     DB 094,174,102,174,102,176,098,180,098,186,255
+0EC8 66B062B4   
+0ECC 62BAFF     
+0ECF 60B45EB2   =1  1292    NumHrOnes8:     DB 096,180,094,178,094,176,096,174,100,174,102,176,102,178,100,180,096,180
+0ED3 5EB060AE   
+0ED7 64AE66B0   
+0EDB 66B264B4   
+0EDF 60B4       
+0EE1 5EB65EB8   =1  1293                    DB 094,182,094,184,096,186,100,186,102,184,102,182,100,180,255
+0EE5 60BA64BA   
+0EE9 66B866B6   
+0EED 64B4FF     
+0EF0 5EB860BA   =1  1294    NumHrOnes9:     DB 094,184,096,186,100,186,102,184,102,176,100,174,096,174,094,176,094,178
+0EF4 64BA66B8   
+0EF8 66B064AE   
+0EFC 60AE5EB0   
+0F00 5EB2       
+0F02 60B464B4   =1  1295                    DB 096,180,100,180,102,178,255
+0F06 66B2FF     
+                =1  1296    
+0F09 0F0F0F22   =1  1297    NumHrTens:      DW NumHrTens0,NumHrTens1,NumHrTens2
+0F0D 0F29       
+0F0F 52B054AE   =1  1298    NumHrTens0:     DB 082,176,084,174,088,174,090,176,090,184,088,186,084,186,082,184,082,176
+0F13 58AE5AB0   
+0F17 5AB858BA   
+0F1B 54BA52B8   
+0F1F 52B0       
+0F21 FF         =1  1299                    DB 255
+0F22 54B258AE   =1  1300    NumHrTens1:     DB 084,178,088,174,088,186,255
+0F26 58BAFF     
+0F29 52B054AE   =1  1301    NumHrTens2:     DB 082,176,084,174,088,174,090,176,090,178,082,186,090,186,255
+0F2D 58AE5AB0   
+0F31 5AB252BA   
+0F35 5ABAFF     
+                =1  1302    
+0F38 0F3E0F47   =1  1303    DCFStats:       DW DCFStat0,DCFStat1,DCFStat2
+0F3C 0F50       
+0F3E 7A4C7D49   =1  1304    DCFStat0:       DB 122,076,125,073,131,079,134,076,255
+0F42 834F864C   
+0F46 FF         
+0F47 7D528046   =1  1305    DCFStat1:       DB 125,082,128,070,131,082,125,082,255
+0F4B 83527D52   
+0F4F FF         
+0F50 7D528046   =1  1306    DCFStat2:       DB 125,082,128,070,131,082,125,082,000,125,076,122,073,122,070,125,067,131,067
+0F54 83527D52   
+0F58 007D4C7A   
+0F5C 497A467D   
+0F60 438343     
+0F63 86468649   =1  1307                    DB 134,070,134,073,131,076,255
+0F67 834CFF     
+                =1  1308    
+                    1309    ;
+                    1310                    END
+
+VERSION 1.2k ASSEMBLY COMPLETE, 0 ERRORS FOUND
+ACC. . . . . . . . . . . . . . .  D ADDR  00E0H  PREDEFINED  
+B. . . . . . . . . . . . . . . .  D ADDR  00F0H  PREDEFINED  
+BEAM_OFF_DLY_1 . . . . . . . . .    NUMB  00C8H  
+BEAM_ON_DLY_1. . . . . . . . . .    NUMB  00C8H  
+CHECKKEY . . . . . . . . . . . .  C ADDR  0212H  
+CHECKKEY_DOWN. . . . . . . . . .  C ADDR  021EH  
+CHECKKEY_OUT . . . . . . . . . .  C ADDR  0245H  
+CHECKKEY_PROC. . . . . . . . . .  C ADDR  0229H  
+CHECKKEY_PROC0 . . . . . . . . .  C ADDR  022FH  NOT USED  
+CHECKKEY_PROC1 . . . . . . . . .  C ADDR  023CH  
+DCF77. . . . . . . . . . . . . .  C ADDR  0246H  
+DCF77_HI . . . . . . . . . . . .  C ADDR  0250H  NOT USED  
+DCF77_HIC1 . . . . . . . . . . .  C ADDR  0269H  
+DCF77_HIC2 . . . . . . . . . . .  C ADDR  0274H  
+DCF77_LO . . . . . . . . . . . .  C ADDR  0277H  
+DCF77_LOBIT. . . . . . . . . . .  C ADDR  029CH  
+DCF77_LOCKTIME . . . . . . . . .  C ADDR  0291H  
+DCF77_LOFLAG . . . . . . . . . .  C ADDR  0280H  
+DCF77_LOOUT. . . . . . . . . . .  C ADDR  028FH  
+DCF77_OUT. . . . . . . . . . . .  C ADDR  0315H  
+DCF77_TABADD . . . . . . . . . .  C ADDR  02E3H  
+DCF77_TABCHKP. . . . . . . . . .  C ADDR  02CAH  
+DCF77_TABCHKPC . . . . . . . . .  C ADDR  02D3H  
+DCF77_TABCHKPE . . . . . . . . .  C ADDR  02D5H  
+DCF77_TABCLRP. . . . . . . . . .  C ADDR  02D9H  
+DCF77_TABNONE. . . . . . . . . .  C ADDR  02EDH  
+DCF77_TABNULL. . . . . . . . . .  C ADDR  02BEH  NOT USED  
+DCF77_TABOUT . . . . . . . . . .  C ADDR  030FH  
+DCF77_TABRES . . . . . . . . . .  C ADDR  02DEH  
+DCF77_TABSET . . . . . . . . . .  C ADDR  02C4H  
+DCF77_UPDSTAT. . . . . . . . . .  C ADDR  031AH  
+DCF77_UPST0. . . . . . . . . . .  C ADDR  0328H  
+DCF77_UPST1. . . . . . . . . . .  C ADDR  0321H  
+DCF77_VALCKECK . . . . . . . . .  C ADDR  02F5H  
+DCFSTAT0 . . . . . . . . . . . .  C ADDR  0F3EH  
+DCFSTAT1 . . . . . . . . . . . .  C ADDR  0F47H  
+DCFSTAT2 . . . . . . . . . . . .  C ADDR  0F50H  
+DCFSTATS . . . . . . . . . . . .  C ADDR  0F38H  
+DCF_DAY. . . . . . . . . . . . .    NUMB  001AH  
+DCF_DOW. . . . . . . . . . . . .    NUMB  001BH  
+DCF_FLAGS. . . . . . . . . . . .    NUMB  0022H  
+DCF_F_BIT. . . . . . . . . . . .    NUMB  0011H  
+DCF_F_FE . . . . . . . . . . . .    NUMB  0010H  
+DCF_F_PARITY . . . . . . . . . .    NUMB  0012H  
+DCF_F_STATDATA . . . . . . . . .    NUMB  0014H  
+DCF_F_STATOK . . . . . . . . . .    NUMB  0015H  
+DCF_F_TIMEOK . . . . . . . . . .    NUMB  0013H  
+DCF_HITIME . . . . . . . . . . .    NUMB  0008H  
+DCF_HR . . . . . . . . . . . . .    NUMB  0019H  
+DCF_MAXTIME. . . . . . . . . . .    NUMB  000EH  
+DCF_MIN. . . . . . . . . . . . .    NUMB  0018H  
+DCF_MINTIME. . . . . . . . . . .    NUMB  0003H  
+DCF_MON. . . . . . . . . . . . .    NUMB  001CH  
+DCF_R0 . . . . . . . . . . . . .    NUMB  0010H  
+DCF_R1 . . . . . . . . . . . . .    NUMB  0011H  
+DCF_R2 . . . . . . . . . . . . .    NUMB  0012H  
+DCF_R3 . . . . . . . . . . . . .    NUMB  0013H  
+DCF_R4 . . . . . . . . . . . . .    NUMB  0014H  
+DCF_R5 . . . . . . . . . . . . .    NUMB  0015H  NOT USED  
+DCF_SYNCTIME . . . . . . . . . .    NUMB  003CH  
+DCF_TAB. . . . . . . . . . . . .  C ADDR  03C6H  
+DCF_TFLAGS . . . . . . . . . . .    NUMB  0023H  
+DCF_TF_ADD . . . . . . . . . . .    NUMB  001AH  
+DCF_TF_CHKP. . . . . . . . . . .    NUMB  001CH  
+DCF_TF_CLRP. . . . . . . . . . .    NUMB  001BH  
+DCF_TF_NULL. . . . . . . . . . .    NUMB  0018H  
+DCF_TF_RES . . . . . . . . . . .    NUMB  0019H  
+DCF_TF_SET . . . . . . . . . . .    NUMB  001DH  
+DCF_VALCHECK . . . . . . . . . .  C ADDR  047AH  
+DCF_YR . . . . . . . . . . . . .    NUMB  001DH  
+DISPADRNUM . . . . . . . . . . .  C ADDR  019FH  
+DISPADRPTR . . . . . . . . . . .  C ADDR  015AH  
+DISP_TAB . . . . . . . . . . . .    NUMB  0030H  
+DISP_TAB_DCFSH . . . . . . . . .    NUMB  0043H  
+DISP_TAB_DCFSL . . . . . . . . .    NUMB  0042H  
+DISP_TAB_HRNOH . . . . . . . . .    NUMB  003FH  
+DISP_TAB_HRNOL . . . . . . . . .    NUMB  003EH  
+DISP_TAB_HRNTH . . . . . . . . .    NUMB  0041H  
+DISP_TAB_HRNTL . . . . . . . . .    NUMB  0040H  
+DISP_TAB_HRPH. . . . . . . . . .    NUMB  0035H  
+DISP_TAB_HRPL. . . . . . . . . .    NUMB  0034H  
+DISP_TAB_LEN . . . . . . . . . .    NUMB  000BH  
+DISP_TAB_MINNOH. . . . . . . . .    NUMB  003BH  
+DISP_TAB_MINNOL. . . . . . . . .    NUMB  003AH  
+DISP_TAB_MINNTH. . . . . . . . .    NUMB  003DH  
+DISP_TAB_MINNTL. . . . . . . . .    NUMB  003CH  
+DISP_TAB_MINPH . . . . . . . . .    NUMB  0033H  
+DISP_TAB_MINPL . . . . . . . . .    NUMB  0032H  
+DISP_TAB_SCALEH. . . . . . . . .    NUMB  0045H  NOT USED  
+DISP_TAB_SCALEL. . . . . . . . .    NUMB  0044H  NOT USED  
+DISP_TAB_SECNOH. . . . . . . . .    NUMB  0037H  
+DISP_TAB_SECNOL. . . . . . . . .    NUMB  0036H  
+DISP_TAB_SECNTH. . . . . . . . .    NUMB  0039H  
+DISP_TAB_SECNTL. . . . . . . . .    NUMB  0038H  
+DISP_TAB_SECPH . . . . . . . . .    NUMB  0031H  
+DISP_TAB_SECPL . . . . . . . . .    NUMB  0030H  
+DLINE_FLAGS. . . . . . . . . . .    NUMB  0020H  
+DLINE_F_ENEG . . . . . . . . . .    NUMB  0003H  
+DLINE_F_SWXY . . . . . . . . . .    NUMB  0002H  
+DLINE_F_XDIR . . . . . . . . . .    NUMB  0000H  
+DLINE_F_YDIR . . . . . . . . . .    NUMB  0001H  
+DLINE_R0 . . . . . . . . . . . .    NUMB  0000H  NOT USED  
+DLINE_R1 . . . . . . . . . . . .    NUMB  0001H  NOT USED  
+DLINE_R2 . . . . . . . . . . . .    NUMB  0002H  NOT USED  
+DLINE_R3 . . . . . . . . . . . .    NUMB  0003H  
+DLINE_R4 . . . . . . . . . . . .    NUMB  0004H  NOT USED  
+DLINE_R5 . . . . . . . . . . . .    NUMB  0005H  NOT USED  
+DLINE_R6 . . . . . . . . . . . .    NUMB  0006H  NOT USED  
+DLINE_R7 . . . . . . . . . . . .    NUMB  0007H  NOT USED  
+DPH. . . . . . . . . . . . . . .  D ADDR  0083H  PREDEFINED  
+DPL. . . . . . . . . . . . . . .  D ADDR  0082H  PREDEFINED  
+DRAWLINE . . . . . . . . . . . .  C ADDR  032CH  
+DRAWLINELOOP . . . . . . . . . .  C ADDR  0376H  
+DRAWLINE_CHKY. . . . . . . . . .  C ADDR  03A2H  
+DRAWLINE_DIR . . . . . . . . . .  C ADDR  0368H  
+DRAWLINE_DLT . . . . . . . . . .  C ADDR  0346H  
+DRAWLINE_DXC . . . . . . . . . .  C ADDR  034EH  
+DRAWLINE_DYC . . . . . . . . . .  C ADDR  0357H  
+DRAWLINE_ERR . . . . . . . . . .  C ADDR  039BH  
+DRAWLINE_IDL . . . . . . . . . .  C ADDR  0344H  
+DRAWLINE_IDL2. . . . . . . . . .  C ADDR  038CH  
+DRAWLINE_INCX. . . . . . . . . .  C ADDR  03BCH  
+DRAWLINE_INCXN . . . . . . . . .  C ADDR  03C2H  
+DRAWLINE_INCY. . . . . . . . . .  C ADDR  03AFH  
+DRAWLINE_INCYN . . . . . . . . .  C ADDR  03BBH  
+DRAWLINE_OUT . . . . . . . . . .  C ADDR  03C5H  
+DRAW_DLY . . . . . . . . . . . .    NUMB  0012H  
+E0IRQHANDLER . . . . . . . . . .  C ADDR  0106H  
+E0IRQH_DISPADR . . . . . . . . .  C ADDR  0140H  
+E0IRQH_OUT . . . . . . . . . . .  C ADDR  014DH  
+EA . . . . . . . . . . . . . . .  B ADDR  00AFH  PREDEFINED  
+ET0. . . . . . . . . . . . . . .  B ADDR  00A9H  PREDEFINED  
+EX0. . . . . . . . . . . . . . .  B ADDR  00A8H  PREDEFINED  
+GF0. . . . . . . . . . . . . . .    NUMB  0004H  NOT USED  
+GF1. . . . . . . . . . . . . . .    NUMB  0008H  NOT USED  
+HRPTRDATA. . . . . . . . . . . .  C ADDR  0990H  
+IDL. . . . . . . . . . . . . . .    NUMB  0001H  NOT USED  
+IE . . . . . . . . . . . . . . .  D ADDR  00A8H  PREDEFINED  
+INIT_STACK . . . . . . . . . . .    NUMB  0048H  
+IRQ1 . . . . . . . . . . . . . .  C ADDR  0103H  
+IRQ2 . . . . . . . . . . . . . .  C ADDR  0100H  
+IT0. . . . . . . . . . . . . . .  B ADDR  0088H  PREDEFINED  
+KEY_DELAY. . . . . . . . . . . .    NUMB  0032H  
+KEY_REPEAT . . . . . . . . . . .    NUMB  000CH  
+MAIN . . . . . . . . . . . . . .  C ADDR  0034H  
+MAIN_DIMED . . . . . . . . . . .  C ADDR  00CEH  
+MAIN_DIMED_GET . . . . . . . . .  C ADDR  00D4H  
+MAIN_DNORM . . . . . . . . . . .  C ADDR  00DEH  
+MAIN_INITLOOP1 . . . . . . . . .  C ADDR  005CH  
+MAIN_LOOP. . . . . . . . . . . .  C ADDR  00A6H  
+MAIN_NEWADDR . . . . . . . . . .  C ADDR  00AEH  
+MAIN_WAIT. . . . . . . . . . . .  C ADDR  00C9H  
+MINPTRDATA . . . . . . . . . . .  C ADDR  0774H  
+NUMHRONES. . . . . . . . . . . .  C ADDR  0E34H  
+NUMHRONES0 . . . . . . . . . . .  C ADDR  0E48H  
+NUMHRONES1 . . . . . . . . . . .  C ADDR  0E5BH  
+NUMHRONES2 . . . . . . . . . . .  C ADDR  0E62H  
+NUMHRONES3 . . . . . . . . . . .  C ADDR  0E71H  
+NUMHRONES4 . . . . . . . . . . .  C ADDR  0E8DH  
+NUMHRONES5 . . . . . . . . . . .  C ADDR  0E96H  
+NUMHRONES6 . . . . . . . . . . .  C ADDR  0EABH  
+NUMHRONES7 . . . . . . . . . . .  C ADDR  0EC4H  
+NUMHRONES8 . . . . . . . . . . .  C ADDR  0ECFH  
+NUMHRONES9 . . . . . . . . . . .  C ADDR  0EF0H  
+NUMHRTENS. . . . . . . . . . . .  C ADDR  0F09H  
+NUMHRTENS0 . . . . . . . . . . .  C ADDR  0F0FH  
+NUMHRTENS1 . . . . . . . . . . .  C ADDR  0F22H  
+NUMHRTENS2 . . . . . . . . . . .  C ADDR  0F29H  
+NUMMINONES . . . . . . . . . . .  C ADDR  0CF0H  
+NUMMINONES0. . . . . . . . . . .  C ADDR  0D04H  
+NUMMINONES1. . . . . . . . . . .  C ADDR  0D17H  
+NUMMINONES2. . . . . . . . . . .  C ADDR  0D1EH  
+NUMMINONES3. . . . . . . . . . .  C ADDR  0D2DH  
+NUMMINONES4. . . . . . . . . . .  C ADDR  0D49H  
+NUMMINONES5. . . . . . . . . . .  C ADDR  0D52H  
+NUMMINONES6. . . . . . . . . . .  C ADDR  0D67H  
+NUMMINONES7. . . . . . . . . . .  C ADDR  0D80H  
+NUMMINONES8. . . . . . . . . . .  C ADDR  0D8BH  
+NUMMINONES9. . . . . . . . . . .  C ADDR  0DACH  
+NUMMINTENS . . . . . . . . . . .  C ADDR  0DC5H  
+NUMMINTENS0. . . . . . . . . . .  C ADDR  0DD1H  
+NUMMINTENS1. . . . . . . . . . .  C ADDR  0DE4H  
+NUMMINTENS2. . . . . . . . . . .  C ADDR  0DEBH  
+NUMMINTENS3. . . . . . . . . . .  C ADDR  0DFAH  
+NUMMINTENS4. . . . . . . . . . .  C ADDR  0E16H  
+NUMMINTENS5. . . . . . . . . . .  C ADDR  0E1FH  
+NUMSECONES . . . . . . . . . . .  C ADDR  0BACH  
+NUMSECONES0. . . . . . . . . . .  C ADDR  0BC0H  
+NUMSECONES1. . . . . . . . . . .  C ADDR  0BD3H  
+NUMSECONES2. . . . . . . . . . .  C ADDR  0BDAH  
+NUMSECONES3. . . . . . . . . . .  C ADDR  0BE9H  
+NUMSECONES4. . . . . . . . . . .  C ADDR  0C05H  
+NUMSECONES5. . . . . . . . . . .  C ADDR  0C0EH  
+NUMSECONES6. . . . . . . . . . .  C ADDR  0C23H  
+NUMSECONES7. . . . . . . . . . .  C ADDR  0C3CH  
+NUMSECONES8. . . . . . . . . . .  C ADDR  0C47H  
+NUMSECONES9. . . . . . . . . . .  C ADDR  0C68H  
+NUMSECTENS . . . . . . . . . . .  C ADDR  0C81H  
+NUMSECTENS0. . . . . . . . . . .  C ADDR  0C8DH  
+NUMSECTENS1. . . . . . . . . . .  C ADDR  0CA0H  
+NUMSECTENS2. . . . . . . . . . .  C ADDR  0CA7H  
+NUMSECTENS3. . . . . . . . . . .  C ADDR  0CB6H  
+NUMSECTENS4. . . . . . . . . . .  C ADDR  0CD2H  
+NUMSECTENS5. . . . . . . . . . .  C ADDR  0CDBH  
+P1 . . . . . . . . . . . . . . .  D ADDR  0090H  PREDEFINED  
+P1M0 . . . . . . . . . . . . . .  D ADDR  00C1H  PREDEFINED  
+P1M1 . . . . . . . . . . . . . .  D ADDR  00C2H  PREDEFINED  
+P3 . . . . . . . . . . . . . . .  D ADDR  00B0H  PREDEFINED  
+P3M0 . . . . . . . . . . . . . .  D ADDR  00C6H  PREDEFINED  
+P3M1 . . . . . . . . . . . . . .  D ADDR  00C7H  PREDEFINED  
+PD . . . . . . . . . . . . . . .    NUMB  0002H  NOT USED  
+POF. . . . . . . . . . . . . . .    NUMB  0010H  NOT USED  
+PSW. . . . . . . . . . . . . . .  D ADDR  00D0H  PREDEFINED  
+PWDEX. . . . . . . . . . . . . .    NUMB  0020H  NOT USED  
+SCALEDATA. . . . . . . . . . . .  C ADDR  048CH  
+SECPTRDATA . . . . . . . . . . .  C ADDR  0648H  
+SMOD0. . . . . . . . . . . . . .    NUMB  0040H  NOT USED  
+SMOD1. . . . . . . . . . . . . .    NUMB  0080H  NOT USED  
+SP . . . . . . . . . . . . . . .  D ADDR  0081H  PREDEFINED  
+T0CT . . . . . . . . . . . . . .    NUMB  0004H  NOT USED  
+T0GATE . . . . . . . . . . . . .    NUMB  0008H  NOT USED  
+T0IRQHANDLER . . . . . . . . . .  C ADDR  00E7H  
+T0M1 . . . . . . . . . . . . . .    NUMB  0002H  NOT USED  
+T0M2 . . . . . . . . . . . . . .    NUMB  0001H  NOT USED  
+T0MODE3. . . . . . . . . . . . .    NUMB  0003H  NOT USED  
+T1CT . . . . . . . . . . . . . .    NUMB  0040H  NOT USED  
+T1GATE . . . . . . . . . . . . .    NUMB  0080H  NOT USED  
+T1M1 . . . . . . . . . . . . . .    NUMB  0020H  NOT USED  
+T1M2 . . . . . . . . . . . . . .    NUMB  0010H  NOT USED  
+T1MODE3. . . . . . . . . . . . .    NUMB  0003H  NOT USED  
+TCON . . . . . . . . . . . . . .  D ADDR  0088H  PREDEFINED  
+TH0. . . . . . . . . . . . . . .  D ADDR  008CH  PREDEFINED  
+TICKS_HZ . . . . . . . . . . . .    NUMB  0032H  
+TIMERDLY . . . . . . . . . . . .    NUMB  0046H  
+TIME_FLAGS . . . . . . . . . . .    NUMB  0021H  
+TIME_F_ADCH. . . . . . . . . . .    NUMB  0009H  
+TIME_F_KEYREP. . . . . . . . . .    NUMB  000AH  
+TIME_F_SYNC. . . . . . . . . . .    NUMB  000BH  
+TIME_F_UPDD. . . . . . . . . . .    NUMB  0008H  
+TIME_R0. . . . . . . . . . . . .    NUMB  0008H  
+TIME_R1. . . . . . . . . . . . .    NUMB  0009H  
+TIME_R2. . . . . . . . . . . . .    NUMB  000AH  
+TIME_R3. . . . . . . . . . . . .    NUMB  000BH  
+TIME_R4. . . . . . . . . . . . .    NUMB  000CH  
+TIME_R5. . . . . . . . . . . . .    NUMB  000DH  
+TL0. . . . . . . . . . . . . . .  D ADDR  008AH  PREDEFINED  
+TMOD . . . . . . . . . . . . . .  D ADDR  0089H  PREDEFINED  
+TMODE0 . . . . . . . . . . . . .    NUMB  0000H  NOT USED  
+TMODE1 . . . . . . . . . . . . .    NUMB  0001H  
+TMODE2 . . . . . . . . . . . . .    NUMB  0002H  NOT USED  
+WAIT420. . . . . . . . . . . . .  C ADDR  00D2H  
